@@ -12,7 +12,7 @@ Tabs:
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import pandas as pd
@@ -309,8 +309,8 @@ st.markdown(f"""
 
 html, body, [class*="css"] {{ background-color: {BG}; color: {TEXT}; font-family: 'DM Sans', sans-serif; }}
 .main {{ background-color: {BG}; }}
-.block-container {{ padding: 1.5rem 2rem; max-width: 1600px; }}
-.dash-header {{ font-family: 'Inter', sans-serif; font-size: 2.2rem; font-weight: 700; letter-spacing: 0.02em; color: {NAVY}; line-height: 1; }}
+.block-container {{ padding: 1.5rem 1rem; max-width: 1600px; }}
+.dash-header {{ font-family: 'Inter', sans-serif; font-size: clamp(1.2rem, 3vw, 2.2rem); font-weight: 700; letter-spacing: 0.02em; color: {NAVY}; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 .dash-header span {{ color: {ACCENT}; }}
 .dash-sub {{ font-family: 'DM Mono', monospace; font-size: 0.72rem; color: {MUTED}; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 1.5rem; }}
 .kpi-card {{ background: {CARD_BG}; border: 1px solid {BORDER}; border-left: 3px solid {ACCENT}; border-radius: 4px; padding: 1rem 1.2rem; margin-bottom: 1rem; }}
@@ -416,11 +416,32 @@ with h1:
     st.markdown(f'<div class="dash-sub">C-105 Certificates of Occupancy · {len(df):,} permits · {datetime.now().strftime("%b %d, %Y")}</div>', unsafe_allow_html=True)
 with h2:
     st.markdown("<br>", unsafe_allow_html=True)
-    yr = st.selectbox("", ["All Time", "Last 5 Years", "Last 3 Years", "Last 12 Months"], label_visibility="collapsed")
+    yr = st.selectbox("", ["All Time", "Last 5 Years", "Last 3 Years", "Last 12 Months", "Last 6 Months"], label_visibility="collapsed")
 
-cutoff = {"All Time": 2000, "Last 5 Years": datetime.now().year - 5, "Last 3 Years": datetime.now().year - 3, "Last 12 Months": datetime.now().year - 1}.get(yr, 2000)
-df_f = df[df["delivery_year"] >= cutoff] if not df.empty else df
-dq_f = dq[dq["delivery_year"] >= cutoff] if not dq.empty else dq
+# Year-based cutoffs (for delivery_year filtering)
+_year_cutoff_map = {
+    "All Time":      2000,
+    "Last 5 Years":  datetime.now().year - 5,
+    "Last 3 Years":  datetime.now().year - 3,
+    "Last 12 Months": None,
+    "Last 6 Months":  None,
+}
+# Date-based cutoffs (for issue_date filtering — more precise)
+_date_cutoff_map = {
+    "Last 12 Months": (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'),
+    "Last 6 Months":  (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d'),
+}
+
+if yr in _date_cutoff_map:
+    _cutoff_date = _date_cutoff_map[yr]
+    df_f = df[df["issue_date"] >= _cutoff_date] if not df.empty else df
+    # For quarterly data, approximate using delivery_year from the date cutoff
+    _cutoff_year = int(_cutoff_date[:4])
+    dq_f = dq[dq["delivery_year"] >= _cutoff_year] if not dq.empty else dq
+else:
+    _cutoff_year = _year_cutoff_map.get(yr, 2000)
+    df_f = df[df["delivery_year"] >= _cutoff_year] if not df.empty else df
+    dq_f = dq[dq["delivery_year"] >= _cutoff_year] if not dq.empty else dq
 
 # KPIs
 k1, k2, k3, k4, k5 = st.columns(5)
