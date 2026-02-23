@@ -31,20 +31,26 @@ DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:543
 # ─────────────────────────────────────────────────────────────────────────────
 COSTAR_DATA = {
     "North Austin": {
-        "vacancy": 0.14,
+        "vacancy": 0.140,
         "rent_growth": -0.063,
         "inventory": 31903,
         "under_constr": 1065,
         "delivered_12mo": 374,
-        "asking_rent": 1394,
+        "asking_rent": 1395,
+        "absorption_12mo": 1379,
+        "avg_days_on_market": 58,
+        "concession_pct": 0.065,
     },
     "Northwest Austin": {
-        "vacancy": 0.11,
+        "vacancy": 0.110,
         "rent_growth": -0.059,
         "inventory": 35400,
         "under_constr": 586,
         "delivered_12mo": 129,
         "asking_rent": 1343,
+        "absorption_12mo": 364,
+        "avg_days_on_market": 48,
+        "concession_pct": 0.055,
     },
     "East Austin": {
         "vacancy": 0.138,
@@ -52,7 +58,10 @@ COSTAR_DATA = {
         "inventory": 19201,
         "under_constr": 2328,
         "delivered_12mo": 792,
-        "asking_rent": 1773,
+        "asking_rent": 1774,
+        "absorption_12mo": 1636,
+        "avg_days_on_market": 55,
+        "concession_pct": 0.050,
     },
     "Downtown Austin": {
         "vacancy": 0.138,
@@ -60,7 +69,10 @@ COSTAR_DATA = {
         "inventory": 9001,
         "under_constr": 352,
         "delivered_12mo": 1254,
-        "asking_rent": 3574,
+        "asking_rent": 3575,
+        "absorption_12mo": 994,
+        "avg_days_on_market": 62,
+        "concession_pct": 0.045,
     },
     "Pflugerville": {
         "vacancy": 0.139,
@@ -68,15 +80,21 @@ COSTAR_DATA = {
         "inventory": 23825,
         "under_constr": 444,
         "delivered_12mo": 752,
-        "asking_rent": 1387,
+        "asking_rent": 1386,
+        "absorption_12mo": 1074,
+        "avg_days_on_market": 60,
+        "concession_pct": 0.070,
     },
     "Northeast Austin": {
         "vacancy": 0.213,
-        "rent_growth": -0.056,
+        "rent_growth": -0.057,
         "inventory": 19387,
         "under_constr": 2436,
         "delivered_12mo": 3102,
         "asking_rent": 1397,
+        "absorption_12mo": 2138,
+        "avg_days_on_market": 82,
+        "concession_pct": 0.105,
     },
     "South Austin": {
         "vacancy": 0.119,
@@ -85,6 +103,9 @@ COSTAR_DATA = {
         "under_constr": 1063,
         "delivered_12mo": 930,
         "asking_rent": 1386,
+        "absorption_12mo": 955,
+        "avg_days_on_market": 52,
+        "concession_pct": 0.060,
     },
     "Round Rock": {
         "vacancy": 0.105,
@@ -93,6 +114,9 @@ COSTAR_DATA = {
         "under_constr": 217,
         "delivered_12mo": 252,
         "asking_rent": 1426,
+        "absorption_12mo": 1400,
+        "avg_days_on_market": 44,
+        "concession_pct": 0.055,
     },
     "Midtown Austin": {
         "vacancy": 0.127,
@@ -101,14 +125,20 @@ COSTAR_DATA = {
         "under_constr": 1681,
         "delivered_12mo": 426,
         "asking_rent": 1562,
+        "absorption_12mo": 808,
+        "avg_days_on_market": 54,
+        "concession_pct": 0.040,
     },
     "Georgetown-Leander": {
-        "vacancy": 0.167,
+        "vacancy": 0.166,
         "rent_growth": -0.067,
         "inventory": 17489,
         "under_constr": 574,
         "delivered_12mo": 1251,
-        "asking_rent": 1513,
+        "asking_rent": 1514,
+        "absorption_12mo": 2053,
+        "avg_days_on_market": 65,
+        "concession_pct": 0.075,
     },
     "Southeast Austin": {
         "vacancy": 0.209,
@@ -117,6 +147,9 @@ COSTAR_DATA = {
         "under_constr": 571,
         "delivered_12mo": 2335,
         "asking_rent": 1397,
+        "absorption_12mo": 1416,
+        "avg_days_on_market": 78,
+        "concession_pct": 0.095,
     },
     "Riverside": {
         "vacancy": 0.116,
@@ -125,14 +158,20 @@ COSTAR_DATA = {
         "under_constr": 298,
         "delivered_12mo": 401,
         "asking_rent": 1377,
+        "absorption_12mo": 542,
+        "avg_days_on_market": 55,
+        "concession_pct": 0.068,
     },
     "Southwest Austin": {
         "vacancy": 0.113,
-        "rent_growth": -0.035,
+        "rent_growth": -0.034,
         "inventory": 13882,
         "under_constr": 949,
         "delivered_12mo": 803,
-        "asking_rent": 1686,
+        "asking_rent": 1687,
+        "absorption_12mo": 238,
+        "avg_days_on_market": 58,
+        "concession_pct": 0.042,
     },
     "Cedar Park": {
         "vacancy": 0.116,
@@ -141,14 +180,20 @@ COSTAR_DATA = {
         "under_constr": 0,
         "delivered_12mo": 391,
         "asking_rent": 1438,
+        "absorption_12mo": 905,
+        "avg_days_on_market": 50,
+        "concession_pct": 0.058,
     },
     "South Central Austin": {
         "vacancy": 0.116,
-        "rent_growth": -0.036,
+        "rent_growth": -0.035,
         "inventory": 13679,
         "under_constr": 572,
         "delivered_12mo": 570,
-        "asking_rent": 1738,
+        "asking_rent": 1740,
+        "absorption_12mo": 210,
+        "avg_days_on_market": 53,
+        "concession_pct": 0.040,
     },
     "Buda-Kyle": {
         "vacancy": 0.157,
@@ -156,7 +201,10 @@ COSTAR_DATA = {
         "inventory": 11355,
         "under_constr": 280,
         "delivered_12mo": 798,
-        "asking_rent": 1446,
+        "asking_rent": 1445,
+        "absorption_12mo": 992,
+        "avg_days_on_market": 63,
+        "concession_pct": 0.072,
     },
     "San Marcos": {
         "vacancy": 0.214,
@@ -165,22 +213,31 @@ COSTAR_DATA = {
         "under_constr": 807,
         "delivered_12mo": 725,
         "asking_rent": 1261,
+        "absorption_12mo": 1151,
+        "avg_days_on_market": 80,
+        "concession_pct": 0.090,
     },
     "Far North Austin": {
         "vacancy": 0.262,
-        "rent_growth": -0.034,
+        "rent_growth": -0.033,
         "inventory": 4032,
         "under_constr": 336,
         "delivered_12mo": 917,
-        "asking_rent": 1560,
+        "asking_rent": 1561,
+        "absorption_12mo": 701,
+        "avg_days_on_market": 95,
+        "concession_pct": 0.115,
     },
     "Lake Travis": {
-        "vacancy": 0.142,
-        "rent_growth": -0.03,
+        "vacancy": 0.141,
+        "rent_growth": -0.030,
         "inventory": 3978,
         "under_constr": 0,
         "delivered_12mo": 322,
         "asking_rent": 1813,
+        "absorption_12mo": 38,
+        "avg_days_on_market": 68,
+        "concession_pct": 0.048,
     },
     "Central Austin": {
         "vacancy": 0.092,
@@ -189,6 +246,9 @@ COSTAR_DATA = {
         "under_constr": 0,
         "delivered_12mo": 38,
         "asking_rent": 1578,
+        "absorption_12mo": -10,
+        "avg_days_on_market": 42,
+        "concession_pct": 0.030,
     },
     "West Austin": {
         "vacancy": 0.061,
@@ -197,6 +257,9 @@ COSTAR_DATA = {
         "under_constr": 168,
         "delivered_12mo": 0,
         "asking_rent": 2009,
+        "absorption_12mo": 14,
+        "avg_days_on_market": 32,
+        "concession_pct": 0.018,
     },
     "Far West Austin": {
         "vacancy": 0.054,
@@ -205,6 +268,9 @@ COSTAR_DATA = {
         "under_constr": 0,
         "delivered_12mo": 0,
         "asking_rent": 1645,
+        "absorption_12mo": 0,
+        "avg_days_on_market": 28,
+        "concession_pct": 0.015,
     },
 }
 
@@ -292,11 +358,26 @@ def get_costar_df():
     return pd.DataFrame(rows)
 
 def pressure_score(row):
-    v = min((row["vacancy"] - 0.08) / 0.15, 1.0) * 30
-    d = min(row["delivered_12mo"] / max(row["inventory"], 1) / 0.12, 1.0) * 25
-    u = min(row["under_constr"] / max(row["inventory"], 1) / 0.15, 1.0) * 25
-    r = min((-row["rent_growth"]) / 0.08, 1.0) * 20
-    return round(max(0, v + d + u + r), 1)
+    # Existing factors (scaled back to make room for new signals)
+    v = min((row["vacancy"] - 0.08) / 0.15, 1.0) * 25          # 25pts vacancy
+    d = min(row["delivered_12mo"] / max(row["inventory"], 1) / 0.12, 1.0) * 20  # 20pts deliveries
+    u = min(row["under_constr"] / max(row["inventory"], 1) / 0.15, 1.0) * 20   # 20pts pipeline
+    r = min((-row["rent_growth"]) / 0.08, 1.0) * 15             # 15pts rent growth
+
+    # New factors
+    # Absorption: low absorption vs deliveries = pressure (clamped 0-10)
+    absorption_ratio = row.get("absorption_12mo", 0) / max(row["delivered_12mo"], 1)
+    a = max(0.0, min((1 - absorption_ratio) / 0.5, 1.0)) * 10   # 10pts absorption
+
+    # Days on market: above 45 days = pressure signal (clamped 0-5)
+    dom = row.get("avg_days_on_market", 45)
+    dom_score = max(0.0, min((dom - 45) / 60, 1.0)) * 5         # 5pts days on market
+
+    # Concessions: above 4% = distress signal (clamped 0-5)
+    conc = row.get("concession_pct", 0)
+    conc_score = max(0.0, min(max(conc - 0.04, 0) / 0.10, 1.0)) * 5  # 5pts concessions
+
+    return round(max(0, v + d + u + r + a + dom_score + conc_score), 1)
 
 def sig(score):
     if score >= 60: return "SELL"
@@ -493,7 +574,7 @@ with t3:
 # ══════════════ TAB 4 ══════════════
 with t4:
     st.markdown('<div class="section-title">Buy / Hold / Sell Signal by Submarket</div>', unsafe_allow_html=True)
-    st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.62rem;color:{MUTED};margin-bottom:1.5rem;">Composite: vacancy · rent growth · delivery volume · pipeline pressure</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.62rem;color:{MUTED};margin-bottom:1.5rem;">Composite: vacancy (25) · deliveries (20) · pipeline (20) · rent growth (15) · absorption (10) · days on market (5) · concessions (5)</div>', unsafe_allow_html=True)
 
     cs, ch, cb2 = st.columns(3)
     for col, sig_label, sc in [(cs,"SELL",RED),(ch,"HOLD",YELLOW),(cb2,"BUY",GREEN)]:
@@ -511,6 +592,10 @@ with t4:
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{RED if r['rent_growth']<0 else GREEN};">{r['rent_growth']*100:+.1f}%</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">UNDER CONSTR</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;">{r['under_constr']:,}</div>
+                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">ABSORPTION</div>
+                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;">{r.get('absorption_12mo',0):,}</div>
+                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">CONCESSIONS</div>
+                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;">{r.get('concession_pct',0)*100:.1f}%</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">SCORE</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{sc};">{r['score']:.0f}/100</div>
                     </div>
