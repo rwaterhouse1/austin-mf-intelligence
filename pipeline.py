@@ -51,19 +51,19 @@ log = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 ZIP_CROSSWALK = {
     "78701": "Downtown Austin",
-    "78703": "Central Austin",
+    "78703": "West Austin",
     "78705": "Central Austin",
     "78751": "Central Austin",
     "78752": "Central Austin",
     "78756": "Central Austin",
     "78757": "Central Austin",
     "78722": "Midtown Austin",
-    "78723": "Midtown Austin",
-    "78731": "Midtown Austin",
+    "78723": "East Austin",
+    "78731": "Northwest Austin",
     "78702": "East Austin",
     "78721": "East Austin",
     "78724": "East Austin",
-    "78725": "East Austin",
+    "78725": "Southeast Austin",
     "78753": "North Austin",
     "78758": "North Austin",
     "78727": "North Austin",
@@ -73,18 +73,18 @@ ZIP_CROSSWALK = {
     "78717": "Far North Austin",
     "78728": "Far North Austin",
     "78729": "Far North Austin",
-    "78733": "Far West Austin",
-    "78736": "Far West Austin",
-    "78737": "Far West Austin",
-    "78730": "West Austin",
+    "78733": "West Austin",
+    "78736": "Southwest Austin",
+    "78737": "Southwest Austin",
+    "78730": "Northwest Austin",
     "78746": "West Austin",
-    "78704": "South Austin",
+    "78704": "South Central Austin",
     "78745": "South Austin",
     "78748": "South Austin",
-    "78749": "South Austin",
-    "78741": "South Central Austin",
-    "78742": "Riverside",
-    "78744": "Riverside",
+    "78749": "Southwest Austin",
+    "78741": "Riverside",
+    "78742": "East Austin",
+    "78744": "Southeast Austin",
     "78617": "Southeast Austin",
     "78719": "Southeast Austin",
     "78747": "Southeast Austin",
@@ -205,6 +205,8 @@ CREATE INDEX IF NOT EXISTS idx_permits_date      ON co_permits(issue_date);
 CREATE INDEX IF NOT EXISTS idx_permits_submarket ON co_permits(submarket_name);
 CREATE INDEX IF NOT EXISTS idx_permits_year      ON co_permits(delivery_year);
 CREATE INDEX IF NOT EXISTS idx_permits_yyyyq     ON co_permits(delivery_yyyyq);
+
+CREATE OR REPLACE VIEW co_projects AS SELECT * FROM co_permits;
 
 CREATE OR REPLACE VIEW submarket_deliveries AS
 SELECT
