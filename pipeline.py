@@ -206,7 +206,24 @@ CREATE INDEX IF NOT EXISTS idx_permits_submarket ON co_permits(submarket_name);
 CREATE INDEX IF NOT EXISTS idx_permits_year      ON co_permits(delivery_year);
 CREATE INDEX IF NOT EXISTS idx_permits_yyyyq     ON co_permits(delivery_yyyyq);
 
-CREATE OR REPLACE VIEW co_projects AS SELECT * FROM co_permits;
+-- Deduplicated view: collapse sub-permits (BP/EP/PP/MP) per base permit,
+-- then collapse per (address, total_units) to avoid counting the same
+-- building multiple times. NEW/SHELL only, capped at 500 units.
+CREATE OR REPLACE VIEW co_projects AS
+SELECT DISTINCT ON (address, total_units)
+    id, permit_num, issue_date, address, zip_code, latitude, longitude,
+    total_units, project_name, work_class, submarket_id, submarket_name,
+    delivery_year, delivery_quarter, delivery_yyyyq
+FROM (
+    SELECT DISTINCT ON (REGEXP_REPLACE(permit_num, E'\\s+[A-Z]{2}$', ''))
+        *
+    FROM co_permits
+    WHERE work_class IN ('NEW', 'SHELL')
+      AND total_units >= 5
+      AND total_units <= 500
+    ORDER BY REGEXP_REPLACE(permit_num, E'\\s+[A-Z]{2}$', ''), issue_date DESC
+) base_permits
+ORDER BY address, total_units, issue_date DESC;
 
 CREATE OR REPLACE VIEW submarket_deliveries AS
 SELECT
@@ -216,7 +233,7 @@ SELECT
     delivery_yyyyq,
     COUNT(*)           AS project_count,
     SUM(total_units)     AS total_units_delivered
-FROM co_permits
+FROM co_projects
 WHERE total_units >= 5
 GROUP BY COALESCE(submarket_name, 'Unknown'), delivery_year, delivery_quarter, delivery_yyyyq
 ORDER BY delivery_yyyyq, total_units_delivered DESC;
