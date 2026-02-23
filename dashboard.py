@@ -275,49 +275,53 @@ COSTAR_DATA = {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# COLORS
+# MATTHEWS BRAND COLORS
 # ─────────────────────────────────────────────────────────────────────────────
-GOLD = "#C9A84C"
-RED = "#C0392B"
-GREEN = "#27AE60"
-YELLOW = "#F39C12"
-BG = "#0A0C10"
-CARD_BG = "#111318"
-BORDER = "#1E2128"
-TEXT = "#E8E3D8"
-MUTED = "#6B7280"
+ACCENT    = "#C8102E"   # Matthews red — highlights, active tabs, key metrics
+NAVY      = "#1A1A2E"   # Deep navy/charcoal — headers and primary text
+GREEN     = "#16A34A"   # Success / BUY
+AMBER     = "#D97706"   # Warning / HOLD
+RED       = "#C8102E"   # Danger / SELL (same as accent)
+BG        = "#FFFFFF"   # Primary background — white
+CARD_BG   = "#F8F9FA"   # Card background — light gray
+BORDER    = "#E5E7EB"   # Subtle gray border
+TEXT      = "#1A1A2E"   # Primary text — navy
+MUTED     = "#6B7280"   # Secondary text — gray
 
 PLOTLY_LAYOUT = dict(
-    paper_bgcolor=CARD_BG,
-    plot_bgcolor=CARD_BG,
-    font=dict(color=TEXT, family="'DM Mono', monospace"),
-    xaxis=dict(gridcolor=BORDER, zerolinecolor=BORDER),
-    yaxis=dict(gridcolor=BORDER, zerolinecolor=BORDER),
-    legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor=BORDER),
+    paper_bgcolor=BG,
+    plot_bgcolor=BG,
+    font=dict(color=TEXT, family="'DM Sans', sans-serif"),
+    xaxis=dict(gridcolor=BORDER, zerolinecolor=BORDER, tickfont=dict(color=MUTED)),
+    yaxis=dict(gridcolor=BORDER, zerolinecolor=BORDER, tickfont=dict(color=MUTED)),
+    legend=dict(bgcolor="rgba(255,255,255,0.9)", bordercolor=BORDER, font=dict(color=TEXT)),
     margin=dict(t=40, r=20, b=40, l=60),
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Austin MF Intelligence", page_icon="⬛", layout="wide")
+st.set_page_config(page_title="Austin MF Intelligence", page_icon="🏢", layout="wide")
 
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Inter:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 
 html, body, [class*="css"] {{ background-color: {BG}; color: {TEXT}; font-family: 'DM Sans', sans-serif; }}
 .main {{ background-color: {BG}; }}
 .block-container {{ padding: 1.5rem 2rem; max-width: 1600px; }}
-.dash-header {{ font-family: 'Bebas Neue', sans-serif; font-size: 2.8rem; letter-spacing: 0.12em; color: {TEXT}; line-height: 1; }}
+.dash-header {{ font-family: 'Inter', sans-serif; font-size: 2.2rem; font-weight: 700; letter-spacing: 0.02em; color: {NAVY}; line-height: 1; }}
+.dash-header span {{ color: {ACCENT}; }}
 .dash-sub {{ font-family: 'DM Mono', monospace; font-size: 0.72rem; color: {MUTED}; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 1.5rem; }}
-.kpi-card {{ background: {CARD_BG}; border: 1px solid {BORDER}; border-left: 3px solid {GOLD}; padding: 1rem 1.2rem; margin-bottom: 1rem; }}
+.kpi-card {{ background: {CARD_BG}; border: 1px solid {BORDER}; border-left: 3px solid {ACCENT}; border-radius: 4px; padding: 1rem 1.2rem; margin-bottom: 1rem; }}
 .kpi-label {{ font-family: 'DM Mono', monospace; font-size: 0.65rem; color: {MUTED}; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.4rem; }}
-.kpi-value {{ font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: {TEXT}; line-height: 1; }}
+.kpi-value {{ font-family: 'Inter', sans-serif; font-size: 1.9rem; font-weight: 700; color: {NAVY}; line-height: 1; }}
 .section-title {{ font-family: 'DM Mono', monospace; font-size: 0.65rem; color: {MUTED}; letter-spacing: 0.2em; text-transform: uppercase; border-bottom: 1px solid {BORDER}; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
-.stTabs [data-baseweb="tab-list"] {{ background: {CARD_BG}; border-bottom: 1px solid {BORDER}; gap: 0; padding: 0; }}
+.stTabs [data-baseweb="tab-list"] {{ background-color: {BG}; border-bottom: 1px solid {BORDER}; gap: 0; }}
 .stTabs [data-baseweb="tab"] {{ font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: {MUTED}; padding: 0.75rem 1.5rem; border-bottom: 2px solid transparent; background: transparent; }}
-.stTabs [aria-selected="true"] {{ color: {GOLD} !important; border-bottom: 2px solid {GOLD} !important; background: transparent !important; }}
+.stTabs [aria-selected="true"] {{ color: {ACCENT} !important; border-bottom: 2px solid {ACCENT} !important; background: transparent !important; }}
+.stDataFrame {{ border: 1px solid {BORDER}; border-radius: 4px; }}
+input, select, textarea {{ background-color: {CARD_BG} !important; color: {TEXT} !important; border: 1px solid {BORDER} !important; border-radius: 4px !important; }}
 ::-webkit-scrollbar {{ width: 4px; height: 4px; }}
 ::-webkit-scrollbar-track {{ background: {BG}; }}
 ::-webkit-scrollbar-thumb {{ background: {BORDER}; border-radius: 2px; }}
@@ -386,7 +390,7 @@ def sig(score):
 
 def sig_color(score):
     if score >= 60: return RED
-    if score >= 35: return YELLOW
+    if score >= 35: return AMBER
     return GREEN
 
 try:
@@ -408,7 +412,7 @@ dc["signal"] = dc["score"].apply(sig)
 # ─────────────────────────────────────────────────────────────────────────────
 h1, h2 = st.columns([3, 1])
 with h1:
-    st.markdown('<div class="dash-header">AUSTIN MULTIFAMILY INTELLIGENCE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="dash-header">AUSTIN <span>MULTIFAMILY</span> INTELLIGENCE</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="dash-sub">C-105 Certificates of Occupancy · {len(df):,} permits · {datetime.now().strftime("%b %d, %Y")}</div>', unsafe_allow_html=True)
 with h2:
     st.markdown("<br>", unsafe_allow_html=True)
@@ -446,7 +450,11 @@ with t1:
             sub = df_f.groupby("submarket_name")["total_units"].sum().sort_values().reset_index()
             fig = go.Figure(go.Bar(
                 x=sub["total_units"], y=sub["submarket_name"], orientation="h",
-                marker=dict(color=sub["total_units"], colorscale=[[0,"#1A1E26"],[0.5,"#8B6914"],[1,GOLD]], showscale=False),
+                marker=dict(
+                    color=sub["total_units"],
+                    colorscale=[[0, "#E5E7EB"], [0.5, "#9CA3AF"], [1, NAVY]],
+                    showscale=False
+                ),
                 text=sub["total_units"].apply(lambda x: f"{x:,}"), textposition="outside",
                 textfont=dict(size=10, color=MUTED, family="DM Mono"),
             ))
@@ -458,13 +466,13 @@ with t1:
         for _, r in dc.sort_values("score", ascending=False).iterrows():
             sc = sig_color(r["score"])
             st.markdown(f"""
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:8px 10px;background:{CARD_BG};border:1px solid {BORDER};">
-                <div style="flex:1;font-size:0.78rem;">{r['submarket_name']}</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:8px 10px;background:{CARD_BG};border:1px solid {BORDER};border-radius:4px;">
+                <div style="flex:1;font-size:0.78rem;color:{TEXT};">{r['submarket_name']}</div>
                 <div style="width:80px;height:4px;background:{BORDER};border-radius:2px;overflow:hidden;">
-                    <div style="width:{int(r['score'])}%;height:100%;background:{sc};"></div>
+                    <div style="width:{int(r['score'])}%;height:100%;background:{sc};border-radius:2px;"></div>
                 </div>
                 <div style="width:28px;font-family:'DM Mono',monospace;font-size:0.7rem;color:{MUTED};text-align:right;">{r['score']:.0f}</div>
-                <div style="padding:2px 6px;font-family:'DM Mono',monospace;font-size:0.62rem;border:1px solid {sc};color:{sc};">{r['signal']}</div>
+                <div style="padding:2px 6px;font-family:'DM Mono',monospace;font-size:0.62rem;border:1px solid {sc};color:{sc};border-radius:3px;">{r['signal']}</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -474,8 +482,8 @@ with t1:
         qa = dq_f.groupby("delivery_yyyyq")["total_units_delivered"].sum().reset_index().sort_values("delivery_yyyyq")
         qa["rolling"] = qa["total_units_delivered"].rolling(4, min_periods=1).mean()
         fig2 = go.Figure()
-        fig2.add_trace(go.Bar(x=qa["delivery_yyyyq"], y=qa["total_units_delivered"], marker_color=GOLD, opacity=0.5, name="Quarterly"))
-        fig2.add_trace(go.Scatter(x=qa["delivery_yyyyq"], y=qa["rolling"], mode="lines", line=dict(color=TEXT, width=2), name="4Q Avg"))
+        fig2.add_trace(go.Bar(x=qa["delivery_yyyyq"], y=qa["total_units_delivered"], marker_color=ACCENT, opacity=0.4, name="Quarterly"))
+        fig2.add_trace(go.Scatter(x=qa["delivery_yyyyq"], y=qa["rolling"], mode="lines", line=dict(color=NAVY, width=2), name="4Q Avg"))
         fig2.update_layout(**PLOTLY_LAYOUT, height=260)
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -494,8 +502,8 @@ with t2:
             pipe = pipe[pipe["under_constr"] > 0].sort_values("under_constr", ascending=False)
 
             fig3 = go.Figure()
-            fig3.add_trace(go.Bar(x=pipe["submarket_name"], y=pipe["under_constr"], name="Under Construction", marker_color=GOLD, opacity=0.85))
-            fig3.add_trace(go.Bar(x=pipe["submarket_name"], y=pipe["delivered_12mo"], name="Delivered Last 12mo", marker_color="#2C3E50", opacity=0.9))
+            fig3.add_trace(go.Bar(x=pipe["submarket_name"], y=pipe["under_constr"], name="Under Construction", marker_color=NAVY, opacity=0.85))
+            fig3.add_trace(go.Bar(x=pipe["submarket_name"], y=pipe["delivered_12mo"], name="Delivered Last 12mo", marker_color=ACCENT, opacity=0.7))
             fig3.update_layout(**PLOTLY_LAYOUT, barmode="group", height=380, xaxis_tickangle=-45)
             st.plotly_chart(fig3, use_container_width=True)
 
@@ -506,11 +514,11 @@ with t2:
             for _, r in pipe.head(14).iterrows():
                 m = r["months_to_deliver"]
                 uc = r["under_constr"]
-                urgency_c = RED if m <= 6 else (YELLOW if m <= 12 else MUTED)
+                urgency_c = RED if m <= 6 else (AMBER if m <= 12 else MUTED)
                 urgency_l = "IMMINENT" if m <= 6 else (f"~{m:.0f} MO")
                 st.markdown(f"""
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;padding:8px 10px;background:{CARD_BG};border:1px solid {BORDER};border-left:2px solid {urgency_c};">
-                    <div style="flex:1;font-size:0.78rem;">{r['submarket_name']}</div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;padding:8px 10px;background:{CARD_BG};border:1px solid {BORDER};border-left:2px solid {urgency_c};border-radius:4px;">
+                    <div style="flex:1;font-size:0.78rem;color:{TEXT};">{r['submarket_name']}</div>
                     <div style="font-family:'DM Mono',monospace;font-size:0.68rem;color:{MUTED};">{uc:,.0f} UC</div>
                     <div style="font-family:'DM Mono',monospace;font-size:0.68rem;color:{urgency_c};width:75px;text-align:right;">{urgency_l}</div>
                 </div>
@@ -521,11 +529,11 @@ with t2:
     if not df_f.empty:
         top8 = df_f.groupby("submarket_name")["total_units"].sum().nlargest(8).index.tolist()
         ann = df_f[df_f["submarket_name"].isin(top8)].groupby(["delivery_year","submarket_name"])["total_units"].sum().reset_index()
-        colors8 = [GOLD,"#E74C3C","#3498DB","#2ECC71","#9B59B6","#E67E22","#1ABC9C","#F39C12"]
+        colors8 = [NAVY, ACCENT, "#374151", "#6B7280", "#9CA3AF", "#1A1A2E", "#C8102E", "#D97706"]
         fig4 = go.Figure()
         for i, s in enumerate(top8):
             d = ann[ann["submarket_name"] == s]
-            fig4.add_trace(go.Scatter(x=d["delivery_year"], y=d["total_units"], name=s, mode="lines+markers", line=dict(color=colors8[i], width=2), marker=dict(size=5)))
+            fig4.add_trace(go.Scatter(x=d["delivery_year"], y=d["total_units"], name=s, mode="lines+markers", line=dict(color=colors8[i % len(colors8)], width=2), marker=dict(size=5)))
         fig4.update_layout(**PLOTLY_LAYOUT, height=300)
         st.plotly_chart(fig4, use_container_width=True)
 
@@ -533,7 +541,7 @@ with t2:
 with t3:
     st.markdown('<div class="section-title">Delivery Volume vs Current Vacancy — Bubble = Units Under Construction</div>', unsafe_allow_html=True)
     if not df_f.empty:
-        sub_s = df_f.groupby("submarket_name").agg(total_units=("total_units","sum"), projects=("permit_num","count")).reset_index()
+        sub_s = df_f.groupby("submarket_name")["total_units"].sum().reset_index()
         abs_df = sub_s.merge(dc, on="submarket_name", how="inner")
         abs_df["score"] = abs_df.apply(pressure_score, axis=1)
 
@@ -541,16 +549,16 @@ with t3:
             x=abs_df["total_units"], y=abs_df["vacancy"] * 100,
             mode="markers+text",
             marker=dict(size=abs_df["under_constr"].apply(lambda x: max(8, min(x/50,40))),
-                       color=abs_df["score"], colorscale=[[0,GREEN],[0.5,YELLOW],[1,RED]],
+                       color=abs_df["score"], colorscale=[[0,GREEN],[0.5,AMBER],[1,RED]],
                        showscale=True, colorbar=dict(title="Pressure", tickfont=dict(size=9,color=MUTED)),
                        line=dict(width=1,color=BORDER)),
             text=abs_df["submarket_name"].apply(lambda x: x.replace(" Austin","").replace(" County","")),
             textposition="top center", textfont=dict(size=9,color=MUTED,family="DM Mono"),
             hovertemplate="<b>%{text}</b><br>Units: %{x:,}<br>Vacancy: %{y:.1f}%<extra></extra>",
         ))
-        fig5.add_hline(y=10, line=dict(color=GREEN,width=1,dash="dot"), annotation_text="10% baseline")
-        fig5.add_hline(y=15, line=dict(color=YELLOW,width=1,dash="dot"), annotation_text="15% caution")
-        fig5.add_hline(y=20, line=dict(color=RED,width=1,dash="dot"), annotation_text="20% oversupplied")
+        fig5.add_hline(y=10, line=dict(color=GREEN,width=1,dash="dot"), annotation_text="10% baseline", annotation_font_color=MUTED)
+        fig5.add_hline(y=15, line=dict(color=AMBER,width=1,dash="dot"), annotation_text="15% caution", annotation_font_color=MUTED)
+        fig5.add_hline(y=20, line=dict(color=RED,width=1,dash="dot"), annotation_text="20% oversupplied", annotation_font_color=MUTED)
         fig5.update_layout(**PLOTLY_LAYOUT, height=460, xaxis_title="Total Units Delivered (historical)", yaxis_title="Vacancy Rate (%)")
         st.plotly_chart(fig5, use_container_width=True)
 
@@ -559,15 +567,15 @@ with t3:
     fig6 = go.Figure(go.Scatter(
         x=dc["vacancy"]*100, y=dc["rent_growth"]*100,
         mode="markers+text",
-        marker=dict(size=12, color=dc["score"], colorscale=[[0,GREEN],[0.5,YELLOW],[1,RED]], showscale=False, line=dict(width=1,color=BORDER)),
+        marker=dict(size=12, color=dc["score"], colorscale=[[0,GREEN],[0.5,AMBER],[1,RED]], showscale=False, line=dict(width=1,color=BORDER)),
         text=dc["submarket_name"].apply(lambda x: x.replace(" Austin","").replace(" County","")),
         textposition="top center", textfont=dict(size=9,color=MUTED,family="DM Mono"),
         hovertemplate="<b>%{text}</b><br>Vacancy: %{x:.1f}%<br>Rent Growth: %{y:.1f}%<extra></extra>",
     ))
     fig6.add_vline(x=14, line=dict(color=BORDER,width=1,dash="dot"))
     fig6.add_hline(y=0, line=dict(color=BORDER,width=1,dash="dot"))
-    for x, y, label, c in [(8,3,"BUY ZONE",GREEN),(20,3,"RECOVERING",YELLOW),(8,-4,"WATCH",YELLOW),(20,-4,"SELL ZONE",RED)]:
-        fig6.add_annotation(x=x,y=y,text=label,showarrow=False,font=dict(size=8,color=c,family="DM Mono"),bgcolor="rgba(0,0,0,0.6)")
+    for x, y, label, c in [(8,3,"BUY ZONE",GREEN),(20,3,"RECOVERING",AMBER),(8,-4,"WATCH",AMBER),(20,-4,"SELL ZONE",RED)]:
+        fig6.add_annotation(x=x,y=y,text=label,showarrow=False,font=dict(size=8,color=c,family="DM Mono"),bgcolor="rgba(248,249,250,0.85)")
     fig6.update_layout(**PLOTLY_LAYOUT, height=380, xaxis_title="Vacancy Rate (%)", yaxis_title="Rent Growth (%)")
     st.plotly_chart(fig6, use_container_width=True)
 
@@ -577,27 +585,27 @@ with t4:
     st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.62rem;color:{MUTED};margin-bottom:1.5rem;">Composite: vacancy (25) · deliveries (20) · pipeline (20) · rent growth (15) · absorption (10) · days on market (5) · concessions (5)</div>', unsafe_allow_html=True)
 
     cs, ch, cb2 = st.columns(3)
-    for col, sig_label, sc in [(cs,"SELL",RED),(ch,"HOLD",YELLOW),(cb2,"BUY",GREEN)]:
+    for col, sig_label, sc in [(cs,"SELL",RED),(ch,"HOLD",AMBER),(cb2,"BUY",GREEN)]:
         with col:
             filtered = dc[dc["signal"] == sig_label].sort_values("score", ascending=sig_label!="SELL")
-            st.markdown(f'<div style="font-family:\'Bebas Neue\',sans-serif;font-size:1.3rem;color:{sc};letter-spacing:0.1em;margin-bottom:1rem;">{sig_label} — {len(filtered)}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-family:\'Inter\',sans-serif;font-size:1.2rem;font-weight:700;color:{sc};letter-spacing:0.05em;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:2px solid {sc};">{sig_label} — {len(filtered)}</div>', unsafe_allow_html=True)
             for _, r in filtered.iterrows():
                 st.markdown(f"""
-                <div style="padding:10px 12px;background:{CARD_BG};border:1px solid {BORDER};border-left:3px solid {sc};margin-bottom:6px;">
-                    <div style="font-size:0.82rem;font-weight:500;margin-bottom:5px;">{r['submarket_name']}</div>
+                <div style="padding:10px 12px;background:{CARD_BG};border:1px solid {BORDER};border-left:3px solid {sc};margin-bottom:6px;border-radius:4px;">
+                    <div style="font-size:0.82rem;font-weight:600;color:{NAVY};margin-bottom:5px;">{r['submarket_name']}</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;">
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">VACANCY</div>
-                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;">{r['vacancy']*100:.1f}%</div>
+                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{TEXT};">{r['vacancy']*100:.1f}%</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">RENT GROWTH</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{RED if r['rent_growth']<0 else GREEN};">{r['rent_growth']*100:+.1f}%</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">UNDER CONSTR</div>
-                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;">{r['under_constr']:,}</div>
+                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{TEXT};">{r['under_constr']:,}</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">ABSORPTION</div>
-                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;">{r.get('absorption_12mo',0):,}</div>
+                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{TEXT};">{r.get('absorption_12mo',0):,}</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">CONCESSIONS</div>
-                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;">{r.get('concession_pct',0)*100:.1f}%</div>
+                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{TEXT};">{r.get('concession_pct',0)*100:.1f}%</div>
                         <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{MUTED};">SCORE</div>
-                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{sc};">{r['score']:.0f}/100</div>
+                        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:{sc};font-weight:600;">{r['score']:.0f}/100</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -611,8 +619,8 @@ with t4:
         text=sd["score"].apply(lambda x: f"{x:.0f}"), textposition="outside",
         textfont=dict(size=9,color=MUTED,family="DM Mono"),
     ))
-    fig7.add_vline(x=60, line=dict(color=RED,width=1,dash="dot"), annotation_text="SELL")
-    fig7.add_vline(x=35, line=dict(color=YELLOW,width=1,dash="dot"), annotation_text="HOLD")
+    fig7.add_vline(x=60, line=dict(color=RED,width=1,dash="dot"), annotation_text="SELL", annotation_font_color=RED)
+    fig7.add_vline(x=35, line=dict(color=AMBER,width=1,dash="dot"), annotation_text="HOLD", annotation_font_color=AMBER)
     fig7.update_layout(**PLOTLY_LAYOUT, height=520, xaxis_range=[0,110], yaxis_tickfont_size=10, yaxis_tickfont_family="DM Mono")
     st.plotly_chart(fig7, use_container_width=True)
 
@@ -648,8 +656,8 @@ with t5:
         st.download_button("Export CSV", disp.to_csv(index=False), f"austin_co_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
 
 st.markdown(f"""
-<div style="margin-top:3rem;padding-top:1rem;border-top:1px solid {BORDER};display:flex;justify-content:space-between;">
+<div style="margin-top:3rem;padding-top:1rem;border-top:1px solid {BORDER};display:flex;justify-content:space-between;align-items:center;">
     <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:{MUTED};">DATA: Austin Open Data Portal · CoStar Group · C-105 Certificates of Occupancy</div>
-    <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:{MUTED};">MATTHEWS REAL ESTATE INVESTMENT SERVICES</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:{MUTED};letter-spacing:0.12em;">MATTHEWS REAL ESTATE INVESTMENT SERVICES</div>
 </div>
 """, unsafe_allow_html=True)
