@@ -1,0 +1,35 @@
+name: Daily Pipeline (Incremental)
+
+on:
+  schedule:
+    # 6:00 AM CT = 12:00 UTC (CST) or 11:00 UTC (CDT)
+    - cron: '0 12 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  incremental:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install requests psycopg2-binary python-dotenv
+
+      - name: Run incremental pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python pipeline.py incremental
+
+      - name: Run enrich
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python pipeline.py enrich

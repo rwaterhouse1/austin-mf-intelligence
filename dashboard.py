@@ -11,6 +11,7 @@ Tabs:
   5. Permit Browser     — Raw CO data, searchable
 """
 
+import io
 import os
 from datetime import datetime, timedelta
 from typing import Optional
@@ -21,6 +22,10 @@ import streamlit as st
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
+from pptx import Presentation
+from pptx.util import Inches, Pt, Emu
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 
 load_dotenv()
 
@@ -327,6 +332,60 @@ input, select, textarea {{ background-color: {CARD_BG} !important; color: {TEXT}
 ::-webkit-scrollbar-thumb {{ background: {BORDER}; border-radius: 2px; }}
 </style>
 """, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COSTAR XLSX UPLOADER (sidebar)
+# ─────────────────────────────────────────────────────────────────────────────
+COSTAR_COL_MAP = {
+    "Vacancy Rate": "vacancy",
+    "Market Asking Rent/Unit": "asking_rent",
+    "Market Asking Rent Growth": "rent_growth",
+    "Under Construction Units": "under_constr",
+    "12 Mo Delivered Units": "delivered_12mo",
+    "12 Mo Absorbed Units": "absorption_12mo",
+    "Inventory Units": "inventory",
+    "Avg Days on Market": "avg_days_on_market",
+    "Concession (% of Asking Rent)": "concession_pct",
+}
+
+with st.sidebar:
+    st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.65rem;color:{MUTED};letter-spacing:0.15em;text-transform:uppercase;margin-bottom:0.5rem;">Update CoStar Data</div>', unsafe_allow_html=True)
+    uploaded = st.file_uploader("Upload GeographyList.xlsx", type=["xlsx"], label_visibility="collapsed")
+    if uploaded is not None:
+        try:
+            xls = pd.read_excel(uploaded, sheet_name=0)
+            # Identify submarket name column (usually "Geography Name" or first col)
+            name_col = None
+            for c in xls.columns:
+                cl = c.strip().lower()
+                if cl in ("geography name", "submarket", "submarket name", "name"):
+                    name_col = c
+                    break
+            if name_col is None:
+                name_col = xls.columns[0]
+
+            updated_count = 0
+            for _, row in xls.iterrows():
+                sm_name = str(row[name_col]).strip()
+                if sm_name not in COSTAR_DATA:
+                    continue
+                entry = COSTAR_DATA[sm_name]
+                for xlsx_col, field in COSTAR_COL_MAP.items():
+                    matched_col = None
+                    for c in xls.columns:
+                        if xlsx_col.lower() in c.lower():
+                            matched_col = c
+                            break
+                    if matched_col is not None and pd.notna(row[matched_col]):
+                        val = float(row[matched_col])
+                        # CoStar exports rates as percentages (e.g. 14.0 not 0.14)
+                        if field in ("vacancy", "rent_growth", "concession_pct") and abs(val) > 1:
+                            val = val / 100.0
+                        entry[field] = val
+                updated_count += 1
+            st.success(f"Updated {updated_count} submarkets")
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DATA
@@ -676,6 +735,141 @@ with t5:
         st.dataframe(show.head(500), use_container_width=True, height=500, hide_index=True)
         st.download_button("Export CSV", disp.to_csv(index=False), f"austin_co_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# POWERPOINT EXPORT
+# ─────────────────────────────────────────────────────────────────────────────
+PPTX_NAVY = RGBColor(0x1A, 0x1A, 0x2E)
+PPTX_RED = RGBColor(0xC8, 0x10, 0x2E)
+PPTX_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+PPTX_GRAY = RGBColor(0x6B, 0x72, 0x80)
+
+def _add_text(slide, left, top, width, height, text, font_size=12, color=PPTX_NAVY, bold=False, alignment=PP_ALIGN.LEFT):
+    txBox = slide.shapes.add_textbox(Inches(left), Inches(top), Inches(width), Inches(height))
+    tf = txBox.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.text = text
+    p.font.size = Pt(font_size)
+    p.font.color.rgb = color
+    p.font.bold = bold
+    p.alignment = alignment
+    return tf
+
+def build_pptx(dc_df, df_filtered):
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+
+    # --- Slide 1: Title ---
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+    slide.background.fill.solid()
+    slide.background.fill.fore_color.rgb = PPTX_NAVY
+    _add_text(slide, 0.8, 1.5, 11, 1.5, "AUSTIN MULTIFAMILY INTELLIGENCE", 44, PPTX_WHITE, True, PP_ALIGN.LEFT)
+    _add_text(slide, 0.8, 3.2, 8, 0.8, "Market Analysis & Investment Signals", 22, PPTX_RED, False, PP_ALIGN.LEFT)
+    _add_text(slide, 0.8, 5.0, 8, 0.6, f"Matthews Real Estate Investment Services  |  {datetime.now().strftime('%B %d, %Y')}", 14, PPTX_GRAY, False, PP_ALIGN.LEFT)
+
+    # --- Slide 2: Market KPIs ---
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_text(slide, 0.8, 0.4, 10, 0.6, "MARKET KPIs", 28, PPTX_NAVY, True)
+    _add_text(slide, 0.8, 1.0, 10, 0.3, f"All Time (2010+)  |  C-105 Certificates of Occupancy", 12, PPTX_GRAY)
+    kpis = [
+        ("Units Delivered", f"{int(df_filtered['total_units'].sum()):,}" if not df_filtered.empty else "N/A"),
+        ("Projects", f"{len(df_filtered):,}" if not df_filtered.empty else "N/A"),
+        ("Avg Project Size", f"{int(df_filtered['total_units'].mean()):,}" if not df_filtered.empty else "N/A"),
+        ("Sell Signal Mkts", f"{len(dc_df[dc_df['signal']=='SELL'])}"),
+    ]
+    for i, (label, val) in enumerate(kpis):
+        x = 0.8 + i * 3.0
+        _add_text(slide, x, 2.0, 2.8, 0.4, label, 12, PPTX_GRAY)
+        _add_text(slide, x, 2.5, 2.8, 0.8, val, 36, PPTX_NAVY, True)
+
+    # --- Slide 3: Top 5 SELL submarkets ---
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_text(slide, 0.8, 0.4, 10, 0.6, "SELL SIGNAL SUBMARKETS", 28, PPTX_RED, True)
+    sells = dc_df[dc_df["signal"] == "SELL"].sort_values("score", ascending=False).head(5)
+    headers = ["Submarket", "Score", "Vacancy", "Rent Growth", "Under Constr", "Absorption"]
+    for j, h in enumerate(headers):
+        _add_text(slide, 0.8 + j * 2.0, 1.5, 1.9, 0.4, h, 11, PPTX_GRAY, True)
+    for i, (_, r) in enumerate(sells.iterrows()):
+        y = 2.0 + i * 0.6
+        vals = [r["submarket_name"], f"{r['score']:.0f}/100", f"{r['vacancy']*100:.1f}%",
+                f"{r['rent_growth']*100:+.1f}%", f"{r['under_constr']:,.0f}", f"{r.get('absorption_12mo',0):,.0f}"]
+        for j, v in enumerate(vals):
+            color = PPTX_RED if j == 1 else PPTX_NAVY
+            _add_text(slide, 0.8 + j * 2.0, y, 1.9, 0.5, v, 13, color, j == 0)
+
+    # --- Slide 4: Supply Pipeline ---
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_text(slide, 0.8, 0.4, 10, 0.6, "SUPPLY PIPELINE", 28, PPTX_NAVY, True)
+    _add_text(slide, 0.8, 1.0, 10, 0.3, "Top 8 submarkets by units under construction", 12, PPTX_GRAY)
+    top_pipe = dc_df[dc_df["under_constr"] > 0].sort_values("under_constr", ascending=False).head(8)
+    headers = ["Submarket", "Under Constr", "Delivered 12mo", "Inventory", "Vacancy"]
+    for j, h in enumerate(headers):
+        _add_text(slide, 0.8 + j * 2.4, 1.6, 2.3, 0.4, h, 11, PPTX_GRAY, True)
+    for i, (_, r) in enumerate(top_pipe.iterrows()):
+        y = 2.1 + i * 0.55
+        vals = [r["submarket_name"], f"{r['under_constr']:,.0f}", f"{r['delivered_12mo']:,.0f}",
+                f"{r['inventory']:,.0f}", f"{r['vacancy']*100:.1f}%"]
+        for j, v in enumerate(vals):
+            _add_text(slide, 0.8 + j * 2.4, y, 2.3, 0.4, v, 12, PPTX_NAVY, j == 0)
+
+    # --- Slide 5: Quadrant Chart (table version) ---
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_text(slide, 0.8, 0.4, 10, 0.6, "VACANCY vs RENT GROWTH", 28, PPTX_NAVY, True)
+    _add_text(slide, 0.8, 1.0, 10, 0.3, "Quadrant analysis — submarkets by investment signal", 12, PPTX_GRAY)
+    sorted_dc = dc_df.sort_values("score", ascending=False)
+    headers = ["Submarket", "Vacancy", "Rent Growth", "Score", "Signal"]
+    for j, h in enumerate(headers):
+        _add_text(slide, 0.8 + j * 2.4, 1.6, 2.3, 0.4, h, 11, PPTX_GRAY, True)
+    for i, (_, r) in enumerate(sorted_dc.head(15).iterrows()):
+        y = 2.1 + i * 0.34
+        sig_c = PPTX_RED if r["signal"] == "SELL" else (RGBColor(0xD9, 0x77, 0x06) if r["signal"] == "HOLD" else RGBColor(0x16, 0xA3, 0x4A))
+        vals = [(r["submarket_name"], PPTX_NAVY), (f"{r['vacancy']*100:.1f}%", PPTX_NAVY),
+                (f"{r['rent_growth']*100:+.1f}%", PPTX_RED if r["rent_growth"] < 0 else RGBColor(0x16, 0xA3, 0x4A)),
+                (f"{r['score']:.0f}", PPTX_NAVY), (r["signal"], sig_c)]
+        for j, (v, c) in enumerate(vals):
+            _add_text(slide, 0.8 + j * 2.4, y, 2.3, 0.3, v, 11, c, j == 0 or j == 4)
+
+    # --- Slide 6: Methodology ---
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_text(slide, 0.8, 0.4, 10, 0.6, "METHODOLOGY & DATA SOURCES", 28, PPTX_NAVY, True)
+    methodology = (
+        "Supply Pressure Score (0-100)\n"
+        "Composite of seven weighted factors:\n"
+        "  - Vacancy Rate: 25 pts\n"
+        "  - 12-Month Deliveries vs Inventory: 20 pts\n"
+        "  - Under Construction vs Inventory: 20 pts\n"
+        "  - Rent Growth (inverted): 15 pts\n"
+        "  - Absorption vs Deliveries: 10 pts\n"
+        "  - Avg Days on Market: 5 pts\n"
+        "  - Concession Rate: 5 pts\n\n"
+        "Signals: BUY (<35) | HOLD (35-59) | SELL (60+)\n\n"
+        "Data Sources:\n"
+        "  - City of Austin Open Data Portal (C-105 Certificates of Occupancy)\n"
+        "  - CoStar Group (vacancy, rent, absorption, pipeline)\n"
+        "  - Filtered to NEW/SHELL permits, 5-500 units, deduplicated by project"
+    )
+    _add_text(slide, 0.8, 1.2, 11, 5.0, methodology, 14, PPTX_NAVY)
+    _add_text(slide, 0.8, 6.5, 11, 0.5, "Matthews Real Estate Investment Services  |  Confidential", 11, PPTX_GRAY)
+
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+    return buf
+
+with st.sidebar:
+    st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.65rem;color:{MUTED};letter-spacing:0.15em;text-transform:uppercase;margin-top:1.5rem;margin-bottom:0.5rem;">Export</div>', unsafe_allow_html=True)
+    pptx_buf = build_pptx(dc, df_f)
+    st.download_button(
+        label="Export to PowerPoint",
+        data=pptx_buf,
+        file_name=f"austin_mf_intelligence_{datetime.now().strftime('%Y%m%d')}.pptx",
+        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FOOTER
+# ─────────────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div style="margin-top:3rem;padding-top:1rem;border-top:1px solid {BORDER};display:flex;justify-content:space-between;align-items:center;">
     <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:{MUTED};">DATA: Austin Open Data Portal · CoStar Group · C-105 Certificates of Occupancy</div>
