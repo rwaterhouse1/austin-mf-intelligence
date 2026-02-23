@@ -208,7 +208,8 @@ CREATE INDEX IF NOT EXISTS idx_permits_yyyyq     ON co_permits(delivery_yyyyq);
 
 -- Deduplicated view: collapse sub-permits (BP/EP/PP/MP) per base permit,
 -- then collapse per (address, total_units) to avoid counting the same
--- building multiple times. NEW/SHELL only, capped at 500 units.
+-- building multiple times. Capped at 500 units. All work classes included
+-- since C-105 permit class already filters to multifamily completions.
 CREATE OR REPLACE VIEW co_projects AS
 SELECT DISTINCT ON (address, total_units)
     id, permit_num, issue_date, address, zip_code, latitude, longitude,
@@ -218,8 +219,7 @@ FROM (
     SELECT DISTINCT ON (REGEXP_REPLACE(permit_num, E'\\s+[A-Z]{2}$', ''))
         *
     FROM co_permits
-    WHERE work_class IN ('NEW', 'SHELL')
-      AND total_units >= 5
+    WHERE total_units >= 5
       AND total_units <= 500
     ORDER BY REGEXP_REPLACE(permit_num, E'\\s+[A-Z]{2}$', ''), issue_date DESC
 ) base_permits
