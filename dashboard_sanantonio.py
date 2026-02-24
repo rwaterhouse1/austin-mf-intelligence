@@ -305,7 +305,7 @@ def load_permits(min_year=2010):
                latitude, longitude, area_sf, total_units, project_name,
                work_class, cd, submarket_name,
                delivery_year, delivery_quarter, delivery_yyyyq
-        FROM co_projects
+        FROM sa_projects
         WHERE total_units >= 5 AND delivery_year >= {min_year} AND issue_date IS NOT NULL
         ORDER BY issue_date DESC
     """, conn)
@@ -319,7 +319,7 @@ def load_quarterly():
     df = pd.read_sql("""
         SELECT submarket_name, delivery_year, delivery_quarter,
                delivery_yyyyq, project_count, total_units_delivered
-        FROM submarket_deliveries WHERE delivery_year >= 2010 ORDER BY delivery_yyyyq
+        FROM sa_submarket_deliveries WHERE delivery_year >= 2010 ORDER BY delivery_yyyyq
     """, conn)
     conn.close()
     return df

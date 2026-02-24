@@ -156,21 +156,21 @@ ZIP_CROSSWALK = {
 SCHEMA_SQL = """
 CREATE EXTENSION IF NOT EXISTS postgis;
 
-CREATE TABLE IF NOT EXISTS costar_submarkets (
+CREATE TABLE IF NOT EXISTS sa_costar_submarkets (
     id              SERIAL PRIMARY KEY,
     submarket_id    VARCHAR(64) UNIQUE NOT NULL,
     submarket_name  VARCHAR(128) NOT NULL,
     geom            GEOMETRY(MULTIPOLYGON, 4326),
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_sa_submarkets_geom ON costar_submarkets USING GIST(geom);
+CREATE INDEX IF NOT EXISTS idx_sa_submarkets_geom ON sa_costar_submarkets USING GIST(geom);
 
-CREATE TABLE IF NOT EXISTS zip_submarket_crosswalk (
+CREATE TABLE IF NOT EXISTS sa_zip_submarket_crosswalk (
     zip_code        VARCHAR(5) PRIMARY KEY,
     submarket_name  VARCHAR(128) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS co_permits_raw (
+CREATE TABLE IF NOT EXISTS sa_permits_raw (
     id              SERIAL PRIMARY KEY,
     permit_num      VARCHAR(64) UNIQUE NOT NULL,
     issue_date      DATE,
@@ -189,12 +189,12 @@ CREATE TABLE IF NOT EXISTS co_permits_raw (
     raw_json        JSONB,
     ingested_at     TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_sa_raw_issue_date  ON co_permits_raw(issue_date);
-CREATE INDEX IF NOT EXISTS idx_sa_raw_total_units ON co_permits_raw(total_units);
+CREATE INDEX IF NOT EXISTS idx_sa_raw_issue_date  ON sa_permits_raw(issue_date);
+CREATE INDEX IF NOT EXISTS idx_sa_raw_total_units ON sa_permits_raw(total_units);
 
-CREATE TABLE IF NOT EXISTS co_permits (
+CREATE TABLE IF NOT EXISTS sa_permits (
     id              SERIAL PRIMARY KEY,
-    permit_num      VARCHAR(64) UNIQUE NOT NULL REFERENCES co_permits_raw(permit_num),
+    permit_num      VARCHAR(64) UNIQUE NOT NULL REFERENCES sa_permits_raw(permit_num),
     issue_date      DATE NOT NULL,
     submitted_date  DATE,
     address         TEXT,
@@ -217,26 +217,26 @@ CREATE TABLE IF NOT EXISTS co_permits (
                     ) STORED,
     enriched_at     TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_sa_permits_geom      ON co_permits USING GIST(geom);
-CREATE INDEX IF NOT EXISTS idx_sa_permits_date      ON co_permits(issue_date);
-CREATE INDEX IF NOT EXISTS idx_sa_permits_submarket ON co_permits(submarket_name);
-CREATE INDEX IF NOT EXISTS idx_sa_permits_year      ON co_permits(delivery_year);
-CREATE INDEX IF NOT EXISTS idx_sa_permits_yyyyq     ON co_permits(delivery_yyyyq);
+CREATE INDEX IF NOT EXISTS idx_sa_permits_geom      ON sa_permits USING GIST(geom);
+CREATE INDEX IF NOT EXISTS idx_sa_permits_date      ON sa_permits(issue_date);
+CREATE INDEX IF NOT EXISTS idx_sa_permits_submarket ON sa_permits(submarket_name);
+CREATE INDEX IF NOT EXISTS idx_sa_permits_year      ON sa_permits(delivery_year);
+CREATE INDEX IF NOT EXISTS idx_sa_permits_yyyyq     ON sa_permits(delivery_yyyyq);
 
 -- Deduplicated view: collapse per (address, total_units) to avoid duplicate entries
 -- Minimum 5 units, maximum 2000 units (sanity cap for estimated units)
-CREATE OR REPLACE VIEW co_projects AS
+CREATE OR REPLACE VIEW sa_projects AS
 SELECT DISTINCT ON (address, total_units)
     id, permit_num, issue_date, submitted_date, address, zip_code,
     latitude, longitude, area_sf, total_units, project_name, work_class,
     cd, submarket_id, submarket_name,
     delivery_year, delivery_quarter, delivery_yyyyq
-FROM co_permits
+FROM sa_permits
 WHERE total_units >= 5
   AND total_units <= 2000
 ORDER BY address, total_units, issue_date DESC;
 
-CREATE OR REPLACE VIEW submarket_deliveries AS
+CREATE OR REPLACE VIEW sa_submarket_deliveries AS
 SELECT
     COALESCE(submarket_name, 'Unknown') AS submarket_name,
     delivery_year,
@@ -244,12 +244,12 @@ SELECT
     delivery_yyyyq,
     COUNT(*)                AS project_count,
     SUM(total_units)        AS total_units_delivered
-FROM co_projects
+FROM sa_projects
 WHERE total_units >= 5
 GROUP BY COALESCE(submarket_name, 'Unknown'), delivery_year, delivery_quarter, delivery_yyyyq
 ORDER BY delivery_yyyyq, total_units_delivered DESC;
 
-CREATE TABLE IF NOT EXISTS pipeline_log (
+CREATE TABLE IF NOT EXISTS sa_pipeline_log (
     id               SERIAL PRIMARY KEY,
     run_at           TIMESTAMPTZ DEFAULT NOW(),
     run_type         VARCHAR(32),
@@ -262,7 +262,7 @@ CREATE TABLE IF NOT EXISTS pipeline_log (
 """
 
 ENRICH_SQL = """
-INSERT INTO co_permits (
+INSERT INTO sa_permits (
     permit_num, issue_date, submitted_date, address, zip_code,
     latitude, longitude, geom, area_sf, total_units, project_name,
     work_class, cd, submarket_id, submarket_name
@@ -285,12 +285,12 @@ SELECT
     r.cd,
     s.submarket_id,
     COALESCE(s.submarket_name, z.submarket_name) AS submarket_name
-FROM co_permits_raw r
-LEFT JOIN costar_submarkets s
+FROM sa_permits_raw r
+LEFT JOIN sa_costar_submarkets s
     ON s.geom IS NOT NULL
     AND r.latitude IS NOT NULL
     AND ST_Contains(s.geom, ST_SetSRID(ST_MakePoint(r.longitude, r.latitude), 4326))
-LEFT JOIN zip_submarket_crosswalk z
+LEFT JOIN sa_zip_submarket_crosswalk z
     ON z.zip_code = COALESCE(
         r.zip_code,
         SUBSTRING(r.address FROM '([0-9]{5})(?:[- ][0-9]{4})?(?:\\s|$)')
@@ -312,7 +312,7 @@ ON CONFLICT (permit_num) DO UPDATE SET
 """
 
 UPSERT_RAW_SQL = """
-INSERT INTO co_permits_raw (
+INSERT INTO sa_permits_raw (
     permit_num, issue_date, submitted_date, address, zip_code,
     latitude, longitude, area_sf, total_units, work_class,
     project_name, permit_type, permit_status, cd, raw_json
@@ -344,7 +344,7 @@ def get_conn():
 
 def last_ingested_date(conn) -> Optional[str]:
     with conn.cursor() as cur:
-        cur.execute("SELECT MAX(issue_date) FROM co_permits_raw WHERE issue_date IS NOT NULL")
+        cur.execute("SELECT MAX(issue_date) FROM sa_permits_raw WHERE issue_date IS NOT NULL")
         result = cur.fetchone()[0]
         return str(result) if result else None
 
@@ -361,10 +361,10 @@ def cmd_setup():
     print("   ✓ Tables, indexes, and views created.")
     print(f"\n② Loading {len(ZIP_CROSSWALK)} zip → submarket mappings...")
     with conn.cursor() as cur:
-        cur.execute("TRUNCATE zip_submarket_crosswalk")
+        cur.execute("TRUNCATE sa_zip_submarket_crosswalk")
         psycopg2.extras.execute_values(
             cur,
-            "INSERT INTO zip_submarket_crosswalk (zip_code, submarket_name) VALUES %s ON CONFLICT DO NOTHING",
+            "INSERT INTO sa_zip_submarket_crosswalk (zip_code, submarket_name) VALUES %s ON CONFLICT DO NOTHING",
             list(ZIP_CROSSWALK.items()),
         )
     conn.commit()
@@ -718,7 +718,7 @@ def run_pipeline(mode: str = "incremental"):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO pipeline_log "
+                    "INSERT INTO sa_pipeline_log"
                     "(run_type,records_fetched,records_new,records_enriched,errors,duration_secs) "
                     "VALUES (%s,%s,%s,%s,%s,%s)",
                     (mode, fetched, new_records, enriched, errors, round(duration, 2)),
@@ -736,23 +736,23 @@ def run_pipeline(mode: str = "incremental"):
 def cmd_status():
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute("SELECT COUNT(*) AS n FROM co_permits_raw")
+        cur.execute("SELECT COUNT(*) AS n FROM sa_permits_raw")
         raw_n = cur.fetchone()["n"]
-        cur.execute("SELECT COUNT(*) AS n FROM co_permits")
+        cur.execute("SELECT COUNT(*) AS n FROM sa_permits")
         enriched_n = cur.fetchone()["n"]
-        cur.execute("SELECT COUNT(*) AS n FROM co_permits WHERE submarket_name IS NOT NULL")
+        cur.execute("SELECT COUNT(*) AS n FROM sa_permits WHERE submarket_name IS NOT NULL")
         matched_n = cur.fetchone()["n"]
-        cur.execute("SELECT MIN(issue_date) mn, MAX(issue_date) mx FROM co_permits")
+        cur.execute("SELECT MIN(issue_date) mn, MAX(issue_date) mx FROM sa_permits")
         dates = cur.fetchone()
-        cur.execute("SELECT * FROM pipeline_log ORDER BY run_at DESC LIMIT 1")
+        cur.execute("SELECT * FROM sa_pipeline_log ORDER BY run_at DESC LIMIT 1")
         last = cur.fetchone()
         cur.execute("""
             SELECT submarket_name, SUM(total_units) AS units, COUNT(*) AS projects
-            FROM co_permits WHERE submarket_name IS NOT NULL
+            FROM sa_permits WHERE submarket_name IS NOT NULL
             GROUP BY submarket_name ORDER BY units DESC LIMIT 13
         """)
         top = cur.fetchall()
-        cur.execute("SELECT SUM(area_sf) AS total_sf, AVG(area_sf) AS avg_sf FROM co_permits_raw WHERE area_sf > 0")
+        cur.execute("SELECT SUM(area_sf) AS total_sf, AVG(area_sf) AS avg_sf FROM sa_permits_raw WHERE area_sf > 0")
         sf_stats = cur.fetchone()
     conn.close()
 
