@@ -29,7 +29,11 @@ from pptx.enum.text import PP_ALIGN
 
 load_dotenv()
 
-DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/austin_co")
+# Streamlit Cloud secrets → env var → local default
+try:
+    DB_DSN = st.secrets["DATABASE_URL"]
+except (KeyError, FileNotFoundError, AttributeError):
+    DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/austin_co")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # COSTAR DATA — update these from your GeographyList.xlsx periodically
@@ -314,7 +318,14 @@ st.markdown(f"""
 
 html, body, [class*="css"] {{ background-color: {BG}; color: {TEXT}; font-family: 'DM Sans', sans-serif; }}
 .main {{ background-color: {BG}; }}
-.block-container {{ padding: 1.5rem 1rem; max-width: 1600px; }}
+.block-container {{ padding-top: 2rem; padding-right: 1rem; padding-bottom: 1.5rem; padding-left: 1rem; max-width: 1600px; }}
+header[data-testid="stHeader"] {{ display: none !important; }}
+.stDeployButton {{ display: none !important; }}
+#MainMenu {{ display: none !important; }}
+div[data-testid="stToolbar"] {{ display: none !important; }}
+div[data-testid="stDecoration"] {{ display: none !important; }}
+.uploadedFile {{ display: none !important; }}
+section[data-testid="stFileUploadDropzone"] {{ display: none !important; }}
 .dash-header {{ font-family: 'Inter', sans-serif; font-size: clamp(1.2rem, 3vw, 2.2rem); font-weight: 700; letter-spacing: 0.02em; color: {NAVY}; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 .dash-header span {{ color: {ACCENT}; }}
 .dash-sub {{ font-family: 'DM Mono', monospace; font-size: 0.72rem; color: {MUTED}; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 1.5rem; }}
@@ -332,60 +343,6 @@ input, select, textarea {{ background-color: {CARD_BG} !important; color: {TEXT}
 ::-webkit-scrollbar-thumb {{ background: {BORDER}; border-radius: 2px; }}
 </style>
 """, unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# COSTAR XLSX UPLOADER (sidebar)
-# ─────────────────────────────────────────────────────────────────────────────
-COSTAR_COL_MAP = {
-    "Vacancy Rate": "vacancy",
-    "Market Asking Rent/Unit": "asking_rent",
-    "Market Asking Rent Growth": "rent_growth",
-    "Under Construction Units": "under_constr",
-    "12 Mo Delivered Units": "delivered_12mo",
-    "12 Mo Absorbed Units": "absorption_12mo",
-    "Inventory Units": "inventory",
-    "Avg Days on Market": "avg_days_on_market",
-    "Concession (% of Asking Rent)": "concession_pct",
-}
-
-with st.sidebar:
-    st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.65rem;color:{MUTED};letter-spacing:0.15em;text-transform:uppercase;margin-bottom:0.5rem;">Update CoStar Data</div>', unsafe_allow_html=True)
-    uploaded = st.file_uploader("Upload GeographyList.xlsx", type=["xlsx"], label_visibility="collapsed")
-    if uploaded is not None:
-        try:
-            xls = pd.read_excel(uploaded, sheet_name=0)
-            # Identify submarket name column (usually "Geography Name" or first col)
-            name_col = None
-            for c in xls.columns:
-                cl = c.strip().lower()
-                if cl in ("geography name", "submarket", "submarket name", "name"):
-                    name_col = c
-                    break
-            if name_col is None:
-                name_col = xls.columns[0]
-
-            updated_count = 0
-            for _, row in xls.iterrows():
-                sm_name = str(row[name_col]).strip()
-                if sm_name not in COSTAR_DATA:
-                    continue
-                entry = COSTAR_DATA[sm_name]
-                for xlsx_col, field in COSTAR_COL_MAP.items():
-                    matched_col = None
-                    for c in xls.columns:
-                        if xlsx_col.lower() in c.lower():
-                            matched_col = c
-                            break
-                    if matched_col is not None and pd.notna(row[matched_col]):
-                        val = float(row[matched_col])
-                        # CoStar exports rates as percentages (e.g. 14.0 not 0.14)
-                        if field in ("vacancy", "rent_growth", "concession_pct") and abs(val) > 1:
-                            val = val / 100.0
-                        entry[field] = val
-                updated_count += 1
-            st.success(f"Updated {updated_count} submarkets")
-        except Exception as e:
-            st.error(f"Error reading file: {e}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DATA
@@ -519,7 +476,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ─────────────────────────────────────────────────────────────────────────────
 # TABS
 # ─────────────────────────────────────────────────────────────────────────────
-t1, t2, t3, t4, t5 = st.tabs(["  MARKET OVERVIEW  ", "  SUPPLY PIPELINE  ", "  ABSORPTION  ", "  TIMING INTELLIGENCE  ", "  PERMIT BROWSER  "])
+t1, t2, t3, t4, t5, t6 = st.tabs(["  MARKET OVERVIEW  ", "  SUPPLY PIPELINE  ", "  ABSORPTION  ", "  TIMING INTELLIGENCE  ", "  PERMIT BROWSER  ", "  MAP  "])
 
 # ══════════════ TAB 1 ══════════════
 with t1:
@@ -555,7 +512,7 @@ with t1:
                 <div style="padding:2px 6px;font-family:'DM Mono',monospace;font-size:0.62rem;border:1px solid {sc};color:{sc};border-radius:3px;">{r['signal']}</div>
             </div>
             """, unsafe_allow_html=True)
-
++
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-title">Quarterly Deliveries — All Submarkets</div>', unsafe_allow_html=True)
     if not dq_f.empty:
@@ -734,6 +691,32 @@ with t5:
         })
         st.dataframe(show.head(500), use_container_width=True, height=500, hide_index=True)
         st.download_button("Export CSV", disp.to_csv(index=False), f"austin_co_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
+
+# ══════════════ TAB 6 — MAP ══════════════
+with t6:
+    st.markdown('<div class="section-title">Permit Locations</div>', unsafe_allow_html=True)
+    if not df_f.empty:
+        map_df = df_f.dropna(subset=["latitude", "longitude"]).copy()
+        map_df = map_df[(map_df["latitude"] != 0) & (map_df["longitude"] != 0)]
+        if not map_df.empty:
+            ma, mb = st.columns([2, 1])
+            with mb:
+                map_subs = ["All Submarkets"] + sorted(map_df["submarket_name"].dropna().unique().tolist())
+                map_sub_sel = st.selectbox("Submarket", map_subs, label_visibility="collapsed", key="map_sub")
+                map_min_units = st.slider("Minimum units", 5, 200, 5, key="map_units")
+            map_show = map_df.copy()
+            if map_sub_sel != "All Submarkets":
+                map_show = map_show[map_show["submarket_name"] == map_sub_sel]
+            if map_min_units > 5:
+                map_show = map_show[map_show["total_units"] >= map_min_units]
+            with mb:
+                st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.62rem;color:{MUTED};margin-top:0.5rem;">{len(map_show):,} permits mapped</div>', unsafe_allow_html=True)
+            with ma:
+                st.map(map_show, latitude="latitude", longitude="longitude", size="total_units")
+        else:
+            st.info("No geocoded permits available.")
+    else:
+        st.info("No permit data loaded.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # POWERPOINT EXPORT
