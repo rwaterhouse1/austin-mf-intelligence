@@ -318,7 +318,8 @@ st.markdown(f"""
 
 html, body, [class*="css"] {{ background-color: {BG}; color: {TEXT}; font-family: 'DM Sans', sans-serif; }}
 .main {{ background-color: {BG}; }}
-.block-container {{ padding-top: 2rem; padding-right: 1rem; padding-bottom: 1.5rem; padding-left: 1rem; max-width: 1600px; }}
+.stApp {{ margin-top: 0; padding-top: 0; }}
+.block-container {{ padding-top: 0 !important; padding-right: 1rem; padding-bottom: 1.5rem; padding-left: 1rem; max-width: 1600px; }}
 header[data-testid="stHeader"] {{ display: none !important; }}
 .stDeployButton {{ display: none !important; }}
 #MainMenu {{ display: none !important; }}
@@ -326,6 +327,12 @@ div[data-testid="stToolbar"] {{ display: none !important; }}
 div[data-testid="stDecoration"] {{ display: none !important; }}
 .uploadedFile {{ display: none !important; }}
 section[data-testid="stFileUploadDropzone"] {{ display: none !important; }}
+div[data-testid="stFileDropzoneInput"] {{ display: none !important; }}
+[data-testid="stFileUploader"] {{ display: none !important; }}
+.stFileDropzone {{ display: none !important; }}
+div[data-testid="stAppViewBlockContainer"] [data-testid="stFileUploader"] {{ display: none !important; }}
+.drag-drop-container {{ display: none !important; }}
+[data-testid="stFileDropzone"] {{ display: none !important; }}
 .dash-header {{ font-family: 'Inter', sans-serif; font-size: clamp(1.2rem, 3vw, 2.2rem); font-weight: 700; letter-spacing: 0.02em; color: {NAVY}; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 .dash-header span {{ color: {ACCENT}; }}
 .dash-sub {{ font-family: 'DM Mono', monospace; font-size: 0.72rem; color: {MUTED}; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 1.5rem; }}
@@ -512,7 +519,7 @@ with t1:
                 <div style="padding:2px 6px;font-family:'DM Mono',monospace;font-size:0.62rem;border:1px solid {sc};color:{sc};border-radius:3px;">{r['signal']}</div>
             </div>
             """, unsafe_allow_html=True)
-+
+
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-title">Quarterly Deliveries — All Submarkets</div>', unsafe_allow_html=True)
     if not dq_f.empty:
