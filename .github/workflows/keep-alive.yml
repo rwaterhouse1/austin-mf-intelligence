@@ -15,6 +15,5 @@ jobs:
       - name: Ping Austin dashboard
         run: curl -s -o /dev/null -w "%{http_code}" https://austin-mf-intelligence-pih3ars9zyv46akshj2fjc.streamlit.app
 
-      # Uncomment once the San Antonio dashboard is deployed:
-      # - name: Ping San Antonio dashboard
-      #   run: curl -s -o /dev/null -w "%{http_code}" https://YOUR-SA-APP-URL.streamlit.app
+      - name: Ping San Antonio dashboard
+        run: curl -s -o /dev/null -w "%{http_code}" https://austin-mf-intelligence-dl7ukhfym4fswjovfg5qwu.streamlit.app
