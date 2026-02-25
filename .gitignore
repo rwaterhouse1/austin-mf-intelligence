@@ -3,4 +3,5 @@ __pycache__/
 pipeline.log
 pipeline_sanantonio.log
 .claude/
-.streamlit/secrets.toml
+# TODO: move secrets to Streamlit Cloud settings UI and uncomment this line
+# .streamlit/secrets.toml
