@@ -1,4 +1,6 @@
 .env
 __pycache__/
 pipeline.log
+pipeline_sanantonio.log
 .claude/
+.streamlit/secrets.toml

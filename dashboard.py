@@ -437,7 +437,7 @@ dc["signal"] = dc["score"].apply(sig)
 h1, h2 = st.columns([3, 1])
 with h1:
     st.markdown('<div class="dash-header">AUSTIN <span>MULTIFAMILY</span> INTELLIGENCE</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="dash-sub">C-105 Certificates of Occupancy · {len(df):,} permits · {datetime.now().strftime("%b %d, %Y")}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="dash-sub">Certificates of Occupancy · {len(df):,} permits · {datetime.now().strftime("%b %d, %Y")}</div>', unsafe_allow_html=True)
 with h2:
     st.markdown("<br>", unsafe_allow_html=True)
     yr = st.selectbox("", ["All Time", "Last 5 Years", "Last 3 Years", "Last 12 Months", "Last 6 Months"], label_visibility="collapsed")
@@ -836,9 +836,9 @@ def build_pptx(dc_df, df_filtered):
         "  - Concession Rate: 5 pts\n\n"
         "Signals: BUY (<35) | HOLD (35-59) | SELL (60+)\n\n"
         "Data Sources:\n"
-        "  - City of Austin Open Data Portal (C-105 Certificates of Occupancy)\n"
+        "  - City of Austin Open Data Portal (C-104, C-105, C-106 Certificates of Occupancy)\n"
         "  - CoStar Group (vacancy, rent, absorption, pipeline)\n"
-        "  - Filtered to NEW/SHELL permits, 5-500 units, deduplicated by project"
+        "  - Filtered to NEW permits, 5-1000 units, deduplicated by master permit"
     )
     _add_text(slide, 0.8, 1.2, 11, 5.0, methodology, 14, PPTX_NAVY)
     _add_text(slide, 0.8, 6.5, 11, 0.5, "Matthews Real Estate Investment Services  |  Confidential", 11, PPTX_GRAY)
@@ -863,7 +863,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div style="margin-top:3rem;padding-top:1rem;border-top:1px solid {BORDER};display:flex;justify-content:space-between;align-items:center;">
-    <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:{MUTED};">DATA: Austin Open Data Portal · CoStar Group · C-105 Certificates of Occupancy</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:{MUTED};">DATA: Austin Open Data Portal · CoStar Group · Certificates of Occupancy</div>
     <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:{MUTED};letter-spacing:0.12em;">MATTHEWS REAL ESTATE INVESTMENT SERVICES</div>
 </div>
 """, unsafe_allow_html=True)
