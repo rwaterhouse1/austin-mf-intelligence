@@ -58,7 +58,7 @@ ZIP_CROSSWALK = {
     "78703": "West Austin",
     "78705": "Central Austin",
     "78751": "Central Austin",
-    "78752": "Central Austin",
+    "78752": "Midtown Austin",
     "78756": "Central Austin",
     "78757": "Central Austin",
     "78722": "Midtown Austin",
