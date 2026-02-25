@@ -355,15 +355,15 @@ input, select, textarea {{ background-color: {CARD_BG} !important; color: {TEXT}
 # DATA
 # ─────────────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
-def load_permits(min_year=2010):
+def load_permits():
     conn = psycopg2.connect(DB_DSN)
-    df = pd.read_sql(f"""
+    df = pd.read_sql("""
         SELECT permit_num, masterpermitnum, permit_class, issue_date, address,
                zip_code, latitude, longitude, total_units, project_name,
                work_class, submarket_name,
                delivery_year, delivery_quarter, delivery_yyyyq
         FROM co_projects
-        WHERE delivery_year >= {min_year} AND issue_date IS NOT NULL
+        WHERE issue_date IS NOT NULL
         ORDER BY issue_date DESC
     """, conn)
     conn.close()
@@ -376,7 +376,7 @@ def load_quarterly():
     df = pd.read_sql("""
         SELECT submarket_name, delivery_year, delivery_quarter,
                delivery_yyyyq, project_count, total_units_delivered
-        FROM submarket_deliveries WHERE delivery_year >= 2010 ORDER BY delivery_yyyyq
+        FROM submarket_deliveries ORDER BY delivery_yyyyq
     """, conn)
     conn.close()
     return df
@@ -444,7 +444,7 @@ with h2:
 
 # Year-based cutoffs (for delivery_year filtering)
 _year_cutoff_map = {
-    "All Time":      2000,
+    "All Time":      None,
     "Last 5 Years":  datetime.now().year - 5,
     "Last 3 Years":  datetime.now().year - 3,
     "Last 12 Months": None,
@@ -463,9 +463,13 @@ if yr in _date_cutoff_map:
     _cutoff_year = int(_cutoff_date[:4])
     dq_f = dq[dq["delivery_year"] >= _cutoff_year] if not dq.empty else dq
 else:
-    _cutoff_year = _year_cutoff_map.get(yr, 2000)
-    df_f = df[df["delivery_year"] >= _cutoff_year] if not df.empty else df
-    dq_f = dq[dq["delivery_year"] >= _cutoff_year] if not dq.empty else dq
+    _cutoff_year = _year_cutoff_map.get(yr)
+    if _cutoff_year is not None:
+        df_f = df[df["delivery_year"] >= _cutoff_year] if not df.empty else df
+        dq_f = dq[dq["delivery_year"] >= _cutoff_year] if not dq.empty else dq
+    else:
+        df_f = df.copy() if not df.empty else df
+        dq_f = dq.copy() if not dq.empty else dq
 
 # KPIs
 k1, k2, k3, k4, k5 = st.columns(5)
@@ -762,7 +766,7 @@ def build_pptx(dc_df, df_filtered):
     # --- Slide 2: Market KPIs ---
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _add_text(slide, 0.8, 0.4, 10, 0.6, "MARKET KPIs", 28, PPTX_NAVY, True)
-    _add_text(slide, 0.8, 1.0, 10, 0.3, f"All Time (2010+)  |  C-105 Certificates of Occupancy", 12, PPTX_GRAY)
+    _add_text(slide, 0.8, 1.0, 10, 0.3, f"All Time  |  Certificates of Occupancy (C-104, C-105, C-106)", 12, PPTX_GRAY)
     kpis = [
         ("Units Delivered", f"{int(df_filtered['total_units'].sum()):,}" if not df_filtered.empty else "N/A"),
         ("Projects", f"{len(df_filtered):,}" if not df_filtered.empty else "N/A"),
