@@ -277,10 +277,14 @@ SELECT
     s.submarket_id,
     COALESCE(s.submarket_name, z.submarket_name) AS submarket_name
 FROM co_permits_raw r
-LEFT JOIN costar_submarkets s
-    ON s.geom IS NOT NULL
-    AND r.latitude IS NOT NULL
-    AND ST_Contains(s.geom, ST_SetSRID(ST_MakePoint(r.longitude, r.latitude), 4326))
+LEFT JOIN LATERAL (
+    SELECT cs.submarket_id, cs.submarket_name
+    FROM costar_submarkets cs
+    WHERE cs.geom IS NOT NULL
+      AND r.latitude IS NOT NULL
+      AND ST_Contains(cs.geom, ST_SetSRID(ST_MakePoint(r.longitude, r.latitude), 4326))
+    LIMIT 1
+) s ON true
 LEFT JOIN zip_submarket_crosswalk z
     ON z.zip_code = COALESCE(
         r.zip_code,

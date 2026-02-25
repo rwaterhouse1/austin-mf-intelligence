@@ -12,6 +12,7 @@ Tabs:
 """
 
 import io
+import json
 import os
 from datetime import datetime, timedelta
 from typing import Optional
@@ -381,6 +382,27 @@ def load_quarterly():
     conn.close()
     return df
 
+@st.cache_data(ttl=300)
+def load_submarket_boundaries():
+    """Load submarket polygon boundaries as GeoJSON from PostGIS."""
+    conn = psycopg2.connect(DB_DSN)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT submarket_name, ST_AsGeoJSON(geom)::text as geojson
+        FROM costar_submarkets
+        WHERE geom IS NOT NULL
+        ORDER BY submarket_name
+    """)
+    features = []
+    for name, geojson_str in cur.fetchall():
+        features.append({
+            "type": "Feature",
+            "properties": {"submarket_name": name},
+            "geometry": json.loads(geojson_str)
+        })
+    conn.close()
+    return {"type": "FeatureCollection", "features": features}
+
 def get_costar_df():
     rows = [{"submarket_name": k, **v} for k, v in COSTAR_DATA.items()]
     return pd.DataFrame(rows)
@@ -706,16 +728,17 @@ with t5:
 
 # ══════════════ TAB 6 — MAP ══════════════
 with t6:
-    st.markdown('<div class="section-title">Permit Locations</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Submarket Boundaries & Permit Locations</div>', unsafe_allow_html=True)
     if not df_f.empty:
         map_df = df_f.dropna(subset=["latitude", "longitude"]).copy()
         map_df = map_df[(map_df["latitude"] != 0) & (map_df["longitude"] != 0)]
         if not map_df.empty:
-            ma, mb = st.columns([2, 1])
+            ma, mb = st.columns([3, 1])
             with mb:
                 map_subs = ["All Submarkets"] + sorted(map_df["submarket_name"].dropna().unique().tolist())
                 map_sub_sel = st.selectbox("Submarket", map_subs, label_visibility="collapsed", key="map_sub")
                 map_min_units = st.slider("Minimum units", 5, 200, 5, key="map_units")
+                show_boundaries = st.checkbox("Show submarket boundaries", value=True, key="map_bounds")
             map_show = map_df.copy()
             if map_sub_sel != "All Submarkets":
                 map_show = map_show[map_show["submarket_name"] == map_sub_sel]
@@ -724,7 +747,79 @@ with t6:
             with mb:
                 st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.62rem;color:{MUTED};margin-top:0.5rem;">{len(map_show):,} permits mapped</div>', unsafe_allow_html=True)
             with ma:
-                st.map(map_show, latitude="latitude", longitude="longitude", size="total_units")
+                fig_map = go.Figure()
+
+                # Submarket boundary polygons
+                if show_boundaries:
+                    try:
+                        geojson = load_submarket_boundaries()
+                        # Color palette for submarkets
+                        sm_colors = [
+                            "#1a1a2e", "#c8102e", "#2a9d8f", "#e9c46a", "#264653",
+                            "#e76f51", "#606c38", "#6d6875", "#0077b6", "#bc6c25",
+                            "#457b9d", "#8338ec", "#06d6a0", "#ef476f", "#ffd166",
+                            "#118ab2", "#073b4c", "#70a288", "#d4a373", "#588157",
+                            "#a7c957", "#6b705c", "#cb997e", "#b5838d", "#e5989b",
+                            "#780000", "#023e8a", "#d00000",
+                        ]
+                        for i, feat in enumerate(geojson["features"]):
+                            name = feat["properties"]["submarket_name"]
+                            if map_sub_sel != "All Submarkets" and name != map_sub_sel:
+                                continue
+                            geom = feat["geometry"]
+                            color = sm_colors[i % len(sm_colors)]
+                            polys = geom.get("coordinates", [])
+                            if geom["type"] == "Polygon":
+                                polys = [polys]
+                            for poly_coords in polys:
+                                ring = poly_coords[0]  # exterior ring
+                                lons = [c[0] for c in ring]
+                                lats = [c[1] for c in ring]
+                                fig_map.add_trace(go.Scattermapbox(
+                                    lon=lons, lat=lats,
+                                    mode="lines",
+                                    line=dict(width=2, color=color),
+                                    fill="toself",
+                                    fillcolor=color.replace(")", ",0.1)").replace("rgb", "rgba") if "rgb" in color else color + "1A",
+                                    name=name,
+                                    showlegend=(poly_coords == polys[0]),
+                                    hoverinfo="name",
+                                ))
+                    except Exception:
+                        pass  # boundaries optional
+
+                # Permit dots
+                fig_map.add_trace(go.Scattermapbox(
+                    lat=map_show["latitude"], lon=map_show["longitude"],
+                    mode="markers",
+                    marker=dict(
+                        size=map_show["total_units"].clip(5, 300).apply(lambda x: max(4, min(x / 15, 18))),
+                        color=ACCENT, opacity=0.7,
+                    ),
+                    text=map_show.apply(lambda r: f"{r.get('project_name','') or r['address']}<br>{r['total_units']:,} units<br>{r['submarket_name']}", axis=1),
+                    hoverinfo="text",
+                    name="Permits",
+                    showlegend=True,
+                ))
+
+                center_lat = map_show["latitude"].mean()
+                center_lon = map_show["longitude"].mean()
+                fig_map.update_layout(
+                    mapbox=dict(
+                        style="carto-positron",
+                        center=dict(lat=center_lat, lon=center_lon),
+                        zoom=9 if map_sub_sel == "All Submarkets" else 11,
+                    ),
+                    margin=dict(l=0, r=0, t=0, b=0),
+                    height=620,
+                    legend=dict(
+                        bgcolor="rgba(255,255,255,0.85)",
+                        font=dict(size=9, family="DM Mono"),
+                        x=0.01, y=0.99, xanchor="left", yanchor="top",
+                    ),
+                    showlegend=True,
+                )
+                st.plotly_chart(fig_map, use_container_width=True)
         else:
             st.info("No geocoded permits available.")
     else:
