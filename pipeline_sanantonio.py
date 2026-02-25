@@ -26,7 +26,6 @@ from typing import Optional
 import requests
 import psycopg2
 import psycopg2.extras
-import schedule
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -783,6 +782,7 @@ def cmd_status():
 # SCHEDULER
 # ─────────────────────────────────────────────────────────────────────────────
 def start_scheduler():
+    import schedule
     log.info("SA Scheduler started — incremental pull at 06:00 daily.")
     schedule.every().day.at("06:00").do(run_pipeline, mode="incremental")
     while True:
