@@ -826,121 +826,421 @@ with t6:
         st.info("No permit data loaded.")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# POWERPOINT EXPORT
+# POWERPOINT EXPORT — Submarket Report
 # ─────────────────────────────────────────────────────────────────────────────
-PPTX_NAVY = RGBColor(0x1A, 0x1A, 0x2E)
+PPTX_NAVY = RGBColor(0x1B, 0x2A, 0x4A)
+PPTX_TEAL = RGBColor(0x2A, 0x9D, 0x8F)
+PPTX_LTBLUE = RGBColor(0x45, 0x7B, 0x9D)
 PPTX_RED = RGBColor(0xC8, 0x10, 0x2E)
 PPTX_WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 PPTX_GRAY = RGBColor(0x6B, 0x72, 0x80)
+PPTX_LTGRAY = RGBColor(0xE5, 0xE7, 0xEB)
+PPTX_BLACK = RGBColor(0x1F, 0x1F, 0x1F)
+SLIDE_W = Inches(13.333)
+SLIDE_H = Inches(7.5)
+HEADER_H = Inches(0.9)
 
-def _add_text(slide, left, top, width, height, text, font_size=12, color=PPTX_NAVY, bold=False, alignment=PP_ALIGN.LEFT):
+def _add_text(slide, left, top, width, height, text, font_size=12, color=PPTX_NAVY, bold=False, alignment=PP_ALIGN.LEFT, font_name="Calibri"):
     txBox = slide.shapes.add_textbox(Inches(left), Inches(top), Inches(width), Inches(height))
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.text = text
+    p.text = str(text)
     p.font.size = Pt(font_size)
     p.font.color.rgb = color
     p.font.bold = bold
+    p.font.name = font_name
     p.alignment = alignment
     return tf
 
-def build_pptx(dc_df, df_filtered):
-    prs = Presentation()
-    prs.slide_width = Inches(13.333)
-    prs.slide_height = Inches(7.5)
+def _add_header_bar(slide, title):
+    """Add a dark navy header bar across the top of the slide."""
+    from pptx.util import Emu as _Emu
+    rect = slide.shapes.add_shape(
+        1, Inches(0), Inches(0), SLIDE_W, HEADER_H  # MSO_SHAPE.RECTANGLE = 1
+    )
+    rect.fill.solid()
+    rect.fill.fore_color.rgb = PPTX_NAVY
+    rect.line.fill.background()
+    _add_text(slide, 0.6, 0.15, 10, 0.6, title, 24, PPTX_WHITE, True)
 
-    # --- Slide 1: Title ---
-    slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+def _add_footer(slide, submarket_name):
+    _add_text(slide, 0.6, 6.9, 8, 0.4,
+              f"Matthews Real Estate Investment Services  |  {submarket_name}  |  Confidential",
+              9, PPTX_GRAY, False, PP_ALIGN.LEFT)
+    _add_text(slide, 9, 6.9, 4, 0.4,
+              datetime.now().strftime("%B %d, %Y"),
+              9, PPTX_GRAY, False, PP_ALIGN.RIGHT)
+
+def _add_table(slide, left, top, width, height, headers, rows, col_widths=None):
+    """Add a formatted table to a slide. rows is list of lists of strings."""
+    from pptx.table import Table
+    n_rows = len(rows) + 1  # +1 for header
+    n_cols = len(headers)
+    tbl_shape = slide.shapes.add_table(n_rows, n_cols, Inches(left), Inches(top), Inches(width), Inches(height))
+    tbl = tbl_shape.table
+
+    if col_widths:
+        for i, w in enumerate(col_widths):
+            tbl.columns[i].width = Inches(w)
+
+    # Header row
+    for j, h in enumerate(headers):
+        cell = tbl.cell(0, j)
+        cell.text = h
+        for paragraph in cell.text_frame.paragraphs:
+            paragraph.font.size = Pt(9)
+            paragraph.font.bold = True
+            paragraph.font.color.rgb = PPTX_WHITE
+            paragraph.font.name = "Calibri"
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = PPTX_NAVY
+
+    # Data rows
+    for i, row in enumerate(rows):
+        for j, val in enumerate(row):
+            cell = tbl.cell(i + 1, j)
+            cell.text = str(val)
+            for paragraph in cell.text_frame.paragraphs:
+                paragraph.font.size = Pt(8)
+                paragraph.font.color.rgb = PPTX_BLACK
+                paragraph.font.name = "Calibri"
+            if i % 2 == 0:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = RGBColor(0xF8, 0xF9, 0xFA)
+
+    return tbl_shape
+
+def _render_map_image(map_permits, submarket_name):
+    """Render a static map of permits as a PNG bytes buffer using matplotlib + contextily."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(1, 1, figsize=(10, 7))
+
+    # Draw submarket boundary if available
+    try:
+        conn = psycopg2.connect(DB_DSN)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT ST_AsGeoJSON(geom)::text FROM costar_submarkets
+            WHERE submarket_name = %s AND geom IS NOT NULL
+        """, (submarket_name,))
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            geom = json.loads(row[0])
+            from shapely.geometry import shape as shp_shape
+            boundary = shp_shape(geom)
+            if boundary.geom_type == "MultiPolygon":
+                for poly in boundary.geoms:
+                    xs, ys = poly.exterior.xy
+                    ax.plot(xs, ys, color="#1B2A4A", linewidth=2, zorder=2)
+                    ax.fill(xs, ys, alpha=0.08, color="#1B2A4A", zorder=1)
+            else:
+                xs, ys = boundary.exterior.xy
+                ax.plot(xs, ys, color="#1B2A4A", linewidth=2, zorder=2)
+                ax.fill(xs, ys, alpha=0.08, color="#1B2A4A", zorder=1)
+    except Exception:
+        pass
+
+    if not map_permits.empty:
+        geo = map_permits.dropna(subset=["latitude", "longitude"])
+        geo = geo[(geo["latitude"] != 0) & (geo["longitude"] != 0)]
+        if not geo.empty:
+            sizes = geo["total_units"].clip(10, 500).values * 0.5
+            colors = geo["delivery_year"].values
+            sc = ax.scatter(geo["longitude"], geo["latitude"],
+                           c=colors, cmap="YlGnBu", s=sizes,
+                           alpha=0.75, edgecolors="#1B2A4A", linewidth=0.5, zorder=3)
+            cbar = plt.colorbar(sc, ax=ax, shrink=0.6, pad=0.02)
+            cbar.set_label("Delivery Year", fontsize=8)
+            cbar.ax.tick_params(labelsize=7)
+
+            # Add basemap tiles
+            try:
+                import contextily as ctx
+                pad = 0.01
+                ax.set_xlim(geo["longitude"].min() - pad, geo["longitude"].max() + pad)
+                ax.set_ylim(geo["latitude"].min() - pad, geo["latitude"].max() + pad)
+                ctx.add_basemap(ax, crs="EPSG:4326", source=ctx.providers.CartoDB.Positron, zoom=12)
+            except Exception:
+                pass
+
+    ax.set_title(f"{submarket_name} — Permit Locations", fontsize=12, fontweight="bold", color="#1B2A4A")
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.tick_params(labelsize=7)
+    fig.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+def _chart_to_image(fig_plotly, width=900, height=500):
+    """Convert a plotly figure to PNG bytes using kaleido/orca, fallback to matplotlib."""
+    try:
+        buf = io.BytesIO()
+        fig_plotly.write_image(buf, format="png", width=width, height=height, scale=2)
+        buf.seek(0)
+        return buf
+    except Exception:
+        return None
+
+def build_submarket_pptx(submarket_name, dc_df, df_all, dq_all):
+    """Build a full submarket report PowerPoint deck."""
+    prs = Presentation()
+    prs.slide_width = SLIDE_W
+    prs.slide_height = SLIDE_H
+
+    # Filter data to the selected submarket
+    sm_permits = df_all[df_all["submarket_name"] == submarket_name].copy() if not df_all.empty else pd.DataFrame()
+    sm_costar = dc_df[dc_df["submarket_name"] == submarket_name].iloc[0] if submarket_name in dc_df["submarket_name"].values else None
+
+    # Metro-wide delivery by year (for comparison)
+    metro_by_year = df_all.groupby("delivery_year")["total_units"].sum().reset_index() if not df_all.empty else pd.DataFrame()
+
+    # Submarket delivery by year
+    sm_by_year = sm_permits.groupby("delivery_year")["total_units"].sum().reset_index() if not sm_permits.empty else pd.DataFrame()
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SLIDE 1: TITLE
+    # ═══════════════════════════════════════════════════════════════════════
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
     slide.background.fill.solid()
     slide.background.fill.fore_color.rgb = PPTX_NAVY
-    _add_text(slide, 0.8, 1.5, 11, 1.5, "AUSTIN MULTIFAMILY INTELLIGENCE", 44, PPTX_WHITE, True, PP_ALIGN.LEFT)
-    _add_text(slide, 0.8, 3.2, 8, 0.8, "Market Analysis & Investment Signals", 22, PPTX_RED, False, PP_ALIGN.LEFT)
-    _add_text(slide, 0.8, 5.0, 8, 0.6, f"Matthews Real Estate Investment Services  |  {datetime.now().strftime('%B %d, %Y')}", 14, PPTX_GRAY, False, PP_ALIGN.LEFT)
+    _add_text(slide, 0.8, 1.2, 11, 0.8, "AUSTIN MULTIFAMILY INTELLIGENCE", 20, PPTX_LTGRAY, False)
+    _add_text(slide, 0.8, 2.0, 11, 1.5, submarket_name.upper(), 48, PPTX_WHITE, True)
+    _add_text(slide, 0.8, 3.8, 8, 0.8, "Submarket Report", 26, PPTX_TEAL, False)
+    _add_text(slide, 0.8, 5.2, 8, 0.6,
+              f"Matthews Real Estate Investment Services  |  {datetime.now().strftime('%B %d, %Y')}",
+              14, PPTX_GRAY, False)
 
-    # --- Slide 2: Market KPIs ---
+    # ═══════════════════════════════════════════════════════════════════════
+    # SLIDE 2: SUPPLY PIPELINE SUMMARY
+    # ═══════════════════════════════════════════════════════════════════════
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_text(slide, 0.8, 0.4, 10, 0.6, "MARKET KPIs", 28, PPTX_NAVY, True)
-    _add_text(slide, 0.8, 1.0, 10, 0.3, f"All Time  |  Certificates of Occupancy (C-104, C-105, C-106)", 12, PPTX_GRAY)
-    kpis = [
-        ("Units Delivered", f"{int(df_filtered['total_units'].sum()):,}" if not df_filtered.empty else "N/A"),
-        ("Projects", f"{len(df_filtered):,}" if not df_filtered.empty else "N/A"),
-        ("Avg Project Size", f"{int(df_filtered['total_units'].mean()):,}" if not df_filtered.empty else "N/A"),
-        ("Sell Signal Mkts", f"{len(dc_df[dc_df['signal']=='SELL'])}"),
-    ]
-    for i, (label, val) in enumerate(kpis):
-        x = 0.8 + i * 3.0
-        _add_text(slide, x, 2.0, 2.8, 0.4, label, 12, PPTX_GRAY)
-        _add_text(slide, x, 2.5, 2.8, 0.8, val, 36, PPTX_NAVY, True)
+    _add_header_bar(slide, f"SUPPLY PIPELINE — {submarket_name.upper()}")
 
-    # --- Slide 3: Top 5 SELL submarkets ---
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_text(slide, 0.8, 0.4, 10, 0.6, "SELL SIGNAL SUBMARKETS", 28, PPTX_RED, True)
-    sells = dc_df[dc_df["signal"] == "SELL"].sort_values("score", ascending=False).head(5)
-    headers = ["Submarket", "Score", "Vacancy", "Rent Growth", "Under Constr", "Absorption"]
-    for j, h in enumerate(headers):
-        _add_text(slide, 0.8 + j * 2.0, 1.5, 1.9, 0.4, h, 11, PPTX_GRAY, True)
-    for i, (_, r) in enumerate(sells.iterrows()):
-        y = 2.0 + i * 0.6
-        vals = [r["submarket_name"], f"{r['score']:.0f}/100", f"{r['vacancy']*100:.1f}%",
-                f"{r['rent_growth']*100:+.1f}%", f"{r['under_constr']:,.0f}", f"{r.get('absorption_12mo',0):,.0f}"]
-        for j, v in enumerate(vals):
-            color = PPTX_RED if j == 1 else PPTX_NAVY
-            _add_text(slide, 0.8 + j * 2.0, y, 1.9, 0.5, v, 13, color, j == 0)
+    # KPI boxes
+    kpi_data = []
+    if sm_costar is not None:
+        kpi_data = [
+            ("Total Inventory", f"{int(sm_costar['inventory']):,}"),
+            ("Under Construction", f"{int(sm_costar['under_constr']):,}"),
+            ("Delivered (12mo)", f"{int(sm_costar['delivered_12mo']):,}"),
+            ("Net Absorption (12mo)", f"{int(sm_costar.get('absorption_12mo', 0)):,}"),
+            ("Vacancy Rate", f"{sm_costar['vacancy']*100:.1f}%"),
+            ("Rent Growth", f"{sm_costar['rent_growth']*100:+.1f}%"),
+        ]
+    else:
+        total_units = int(sm_permits["total_units"].sum()) if not sm_permits.empty else 0
+        kpi_data = [
+            ("Total CO Units", f"{total_units:,}"),
+            ("Projects", f"{len(sm_permits):,}"),
+            ("Avg Project Size", f"{int(sm_permits['total_units'].mean()):,}" if not sm_permits.empty else "N/A"),
+        ]
 
-    # --- Slide 4: Supply Pipeline ---
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_text(slide, 0.8, 0.4, 10, 0.6, "SUPPLY PIPELINE", 28, PPTX_NAVY, True)
-    _add_text(slide, 0.8, 1.0, 10, 0.3, "Top 8 submarkets by units under construction", 12, PPTX_GRAY)
-    top_pipe = dc_df[dc_df["under_constr"] > 0].sort_values("under_constr", ascending=False).head(8)
-    headers = ["Submarket", "Under Constr", "Delivered 12mo", "Inventory", "Vacancy"]
-    for j, h in enumerate(headers):
-        _add_text(slide, 0.8 + j * 2.4, 1.6, 2.3, 0.4, h, 11, PPTX_GRAY, True)
-    for i, (_, r) in enumerate(top_pipe.iterrows()):
-        y = 2.1 + i * 0.55
-        vals = [r["submarket_name"], f"{r['under_constr']:,.0f}", f"{r['delivered_12mo']:,.0f}",
-                f"{r['inventory']:,.0f}", f"{r['vacancy']*100:.1f}%"]
-        for j, v in enumerate(vals):
-            _add_text(slide, 0.8 + j * 2.4, y, 2.3, 0.4, v, 12, PPTX_NAVY, j == 0)
+    for i, (label, val) in enumerate(kpi_data):
+        col = i % 3
+        row_idx = i // 3
+        x = 0.6 + col * 4.1
+        y_base = 1.2 + row_idx * 1.4
+        # KPI card background
+        rect = slide.shapes.add_shape(1, Inches(x), Inches(y_base), Inches(3.8), Inches(1.1))
+        rect.fill.solid()
+        rect.fill.fore_color.rgb = RGBColor(0xF8, 0xF9, 0xFA)
+        rect.line.color.rgb = PPTX_LTGRAY
+        rect.line.width = Pt(1)
+        _add_text(slide, x + 0.15, y_base + 0.1, 3.5, 0.3, label, 10, PPTX_GRAY, False)
+        _add_text(slide, x + 0.15, y_base + 0.4, 3.5, 0.6, val, 28, PPTX_NAVY, True)
 
-    # --- Slide 5: Quadrant Chart (table version) ---
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_text(slide, 0.8, 0.4, 10, 0.6, "VACANCY vs RENT GROWTH", 28, PPTX_NAVY, True)
-    _add_text(slide, 0.8, 1.0, 10, 0.3, "Quadrant analysis — submarkets by investment signal", 12, PPTX_GRAY)
-    sorted_dc = dc_df.sort_values("score", ascending=False)
-    headers = ["Submarket", "Vacancy", "Rent Growth", "Score", "Signal"]
-    for j, h in enumerate(headers):
-        _add_text(slide, 0.8 + j * 2.4, 1.6, 2.3, 0.4, h, 11, PPTX_GRAY, True)
-    for i, (_, r) in enumerate(sorted_dc.head(15).iterrows()):
-        y = 2.1 + i * 0.34
-        sig_c = PPTX_RED if r["signal"] == "SELL" else (RGBColor(0xD9, 0x77, 0x06) if r["signal"] == "HOLD" else RGBColor(0x16, 0xA3, 0x4A))
-        vals = [(r["submarket_name"], PPTX_NAVY), (f"{r['vacancy']*100:.1f}%", PPTX_NAVY),
-                (f"{r['rent_growth']*100:+.1f}%", PPTX_RED if r["rent_growth"] < 0 else RGBColor(0x16, 0xA3, 0x4A)),
-                (f"{r['score']:.0f}", PPTX_NAVY), (r["signal"], sig_c)]
-        for j, (v, c) in enumerate(vals):
-            _add_text(slide, 0.8 + j * 2.4, y, 2.3, 0.3, v, 11, c, j == 0 or j == 4)
+    # Delivery by year bar chart (inline as table-bars since kaleido may not be available)
+    if not sm_by_year.empty:
+        _add_text(slide, 0.6, 4.0, 6, 0.4, "UNITS DELIVERED BY YEAR", 12, PPTX_NAVY, True)
+        chart_years = sm_by_year.sort_values("delivery_year").tail(15)
+        chart_rows = []
+        max_units = chart_years["total_units"].max() if not chart_years.empty else 1
+        for _, r in chart_years.iterrows():
+            bar_len = int(r["total_units"] / max_units * 30) if max_units > 0 else 0
+            bar = "█" * bar_len
+            chart_rows.append([str(int(r["delivery_year"])), f"{int(r['total_units']):,}", bar])
+        _add_table(slide, 0.6, 4.4, 7.5, min(3.0, len(chart_rows) * 0.2 + 0.3),
+                   ["Year", "Units", ""], chart_rows,
+                   col_widths=[0.8, 1.0, 5.7])
 
-    # --- Slide 6: Methodology ---
+    # Top 10 projects table
+    if not sm_permits.empty:
+        top10 = sm_permits.nlargest(10, "total_units")
+        _add_text(slide, 8.4, 1.2, 4.5, 0.4, "TOP 10 PROJECTS", 12, PPTX_NAVY, True)
+        t10_rows = []
+        for _, r in top10.iterrows():
+            addr = str(r.get("address", ""))[:35]
+            t10_rows.append([
+                addr,
+                f"{int(r['total_units']):,}",
+                str(r.get("issue_date", ""))[:10],
+            ])
+        _add_table(slide, 8.4, 1.6, 4.5, min(3.5, len(t10_rows) * 0.28 + 0.3),
+                   ["Address", "Units", "CO Date"], t10_rows,
+                   col_widths=[2.5, 0.8, 1.2])
+
+    _add_footer(slide, submarket_name)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SLIDE 3+: PERMIT BROWSER (paginated)
+    # ═══════════════════════════════════════════════════════════════════════
+    if not sm_permits.empty:
+        sorted_permits = sm_permits.sort_values("issue_date", ascending=False)
+        total_permits = len(sorted_permits)
+        total_sm_units = int(sorted_permits["total_units"].sum())
+        avg_size = int(sorted_permits["total_units"].mean())
+        rows_per_page = 25
+        pages = (total_permits + rows_per_page - 1) // rows_per_page
+
+        for page in range(pages):
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            page_label = f" (Page {page+1}/{pages})" if pages > 1 else ""
+            _add_header_bar(slide, f"PERMIT BROWSER — {submarket_name.upper()}{page_label}")
+
+            if page == 0:
+                # Summary stats on first page
+                stats_text = f"{total_permits:,} permits  |  {total_sm_units:,} total units  |  {avg_size:,} avg project size"
+                _add_text(slide, 0.6, 1.1, 10, 0.3, stats_text, 11, PPTX_TEAL, True)
+                tbl_top = 1.5
+            else:
+                tbl_top = 1.2
+
+            chunk = sorted_permits.iloc[page * rows_per_page : (page + 1) * rows_per_page]
+            permit_rows = []
+            for _, r in chunk.iterrows():
+                permit_rows.append([
+                    str(r.get("issue_date", ""))[:10],
+                    str(r.get("address", ""))[:40],
+                    str(r.get("zip_code", "")),
+                    f"{int(r['total_units']):,}",
+                    str(r.get("project_name", "") or "")[:30],
+                    str(r.get("permit_num", "")),
+                ])
+
+            _add_table(slide, 0.6, tbl_top, 12.1, min(5.5, len(permit_rows) * 0.2 + 0.3),
+                       ["CO Date", "Address", "ZIP", "Units", "Project Description", "Permit #"],
+                       permit_rows,
+                       col_widths=[1.2, 3.5, 0.8, 0.8, 3.0, 2.8])
+            _add_footer(slide, submarket_name)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SLIDE: MAP
+    # ═══════════════════════════════════════════════════════════════════════
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_text(slide, 0.8, 0.4, 10, 0.6, "METHODOLOGY & DATA SOURCES", 28, PPTX_NAVY, True)
+    _add_header_bar(slide, f"PERMIT MAP — {submarket_name.upper()}")
+
+    try:
+        map_buf = _render_map_image(sm_permits, submarket_name)
+        slide.shapes.add_picture(map_buf, Inches(0.6), Inches(1.1), Inches(12.1), Inches(5.6))
+    except Exception as e:
+        _add_text(slide, 2, 3, 8, 1, f"Map rendering unavailable: {e}", 14, PPTX_GRAY)
+
+    _add_footer(slide, submarket_name)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SLIDE: DELIVERY TREND (submarket vs metro)
+    # ═══════════════════════════════════════════════════════════════════════
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_header_bar(slide, f"DELIVERY TREND — {submarket_name.upper()}")
+
+    if not sm_by_year.empty:
+        # Build a text-based chart since we can't guarantee plotly image export
+        merged = sm_by_year.rename(columns={"total_units": "sm_units"}).merge(
+            metro_by_year.rename(columns={"total_units": "metro_units"}),
+            on="delivery_year", how="outer"
+        ).fillna(0).sort_values("delivery_year")
+        merged = merged[merged["delivery_year"] >= 1990]  # reasonable range
+
+        _add_text(slide, 0.6, 1.1, 5, 0.4, "Units delivered per year — submarket vs metro average", 11, PPTX_GRAY)
+
+        # Submarket trend as table with visual bars
+        chart_rows = []
+        max_sm = merged["sm_units"].max() if not merged.empty else 1
+        n_submarkets = dc_df["submarket_name"].nunique()
+        for _, r in merged.iterrows():
+            yr = int(r["delivery_year"])
+            sm_u = int(r["sm_units"])
+            metro_avg = int(r["metro_units"] / n_submarkets) if n_submarkets > 0 else 0
+            bar_sm = "█" * int(sm_u / max(max_sm, 1) * 25)
+            chart_rows.append([str(yr), f"{sm_u:,}", f"{metro_avg:,}", bar_sm])
+
+        _add_table(slide, 0.6, 1.5, 12.1, min(5.2, len(chart_rows) * 0.18 + 0.3),
+                   ["Year", f"{submarket_name} Units", "Metro Avg/Submarket", "Submarket Volume"],
+                   chart_rows,
+                   col_widths=[1.0, 2.0, 2.5, 6.6])
+    else:
+        _add_text(slide, 2, 3, 8, 1, "No delivery data available for this submarket.", 14, PPTX_GRAY)
+
+    _add_footer(slide, submarket_name)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SLIDE: ACTIVE CONSTRUCTION (recent 2 years as proxy)
+    # ═══════════════════════════════════════════════════════════════════════
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_header_bar(slide, f"RECENT ACTIVITY — {submarket_name.upper()}")
+
+    current_year = datetime.now().year
+    if not sm_permits.empty:
+        recent = sm_permits[sm_permits["delivery_year"] >= current_year - 2].sort_values("issue_date", ascending=False)
+        _add_text(slide, 0.6, 1.1, 10, 0.3,
+                  f"Projects with CO issued {current_year - 2}–{current_year}  |  {len(recent):,} projects  |  {int(recent['total_units'].sum()):,} units",
+                  11, PPTX_TEAL, True)
+
+        if not recent.empty:
+            recent_rows = []
+            for _, r in recent.head(30).iterrows():
+                recent_rows.append([
+                    str(r.get("issue_date", ""))[:10],
+                    str(r.get("address", ""))[:40],
+                    f"{int(r['total_units']):,}",
+                    str(r.get("project_name", "") or "")[:35],
+                    str(r.get("permit_num", "")),
+                ])
+            _add_table(slide, 0.6, 1.5, 12.1, min(5.2, len(recent_rows) * 0.2 + 0.3),
+                       ["CO Date", "Address", "Units", "Project", "Permit #"],
+                       recent_rows,
+                       col_widths=[1.2, 3.8, 1.0, 3.3, 2.8])
+        else:
+            _add_text(slide, 2, 3, 8, 1, "No recent projects in this submarket.", 14, PPTX_GRAY)
+    else:
+        _add_text(slide, 2, 3, 8, 1, "No permit data available.", 14, PPTX_GRAY)
+
+    _add_footer(slide, submarket_name)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SLIDE: METHODOLOGY
+    # ═══════════════════════════════════════════════════════════════════════
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_header_bar(slide, "METHODOLOGY & DATA SOURCES")
     methodology = (
         "Supply Pressure Score (0-100)\n"
         "Composite of seven weighted factors:\n"
-        "  - Vacancy Rate: 25 pts\n"
-        "  - 12-Month Deliveries vs Inventory: 20 pts\n"
-        "  - Under Construction vs Inventory: 20 pts\n"
-        "  - Rent Growth (inverted): 15 pts\n"
-        "  - Absorption vs Deliveries: 10 pts\n"
-        "  - Avg Days on Market: 5 pts\n"
-        "  - Concession Rate: 5 pts\n\n"
-        "Signals: BUY (<35) | HOLD (35-59) | SELL (60+)\n\n"
+        "  • Vacancy Rate: 25 pts\n"
+        "  • 12-Month Deliveries vs Inventory: 20 pts\n"
+        "  • Under Construction vs Inventory: 20 pts\n"
+        "  • Rent Growth (inverted): 15 pts\n"
+        "  • Absorption vs Deliveries: 10 pts\n"
+        "  • Avg Days on Market: 5 pts\n"
+        "  • Concession Rate: 5 pts\n\n"
+        "Investment Signals: BUY (<35) | HOLD (35-59) | SELL (60+)\n\n"
         "Data Sources:\n"
-        "  - City of Austin Open Data Portal (C-104, C-105, C-106 Certificates of Occupancy)\n"
-        "  - CoStar Group (vacancy, rent, absorption, pipeline)\n"
-        "  - Filtered to NEW permits, 5-1000 units, deduplicated by master permit"
+        "  • City of Austin Open Data Portal — C-104, C-105, C-106 Certificates of Occupancy\n"
+        "  • CoStar Group — vacancy, rent, absorption, pipeline metrics\n"
+        "  • Census TIGER/Line ZCTA — submarket boundary polygons\n"
+        "  • PostGIS ST_Contains — point-in-polygon submarket assignment (98.6% match rate)\n"
+        "  • Filtered to NEW permits, 5–1,000 units, deduplicated by master permit number"
     )
-    _add_text(slide, 0.8, 1.2, 11, 5.0, methodology, 14, PPTX_NAVY)
-    _add_text(slide, 0.8, 6.5, 11, 0.5, "Matthews Real Estate Investment Services  |  Confidential", 11, PPTX_GRAY)
+    _add_text(slide, 0.6, 1.3, 11.5, 5.0, methodology, 13, PPTX_BLACK)
+    _add_footer(slide, submarket_name)
 
     buf = io.BytesIO()
     prs.save(buf)
@@ -949,13 +1249,30 @@ def build_pptx(dc_df, df_filtered):
 
 with st.sidebar:
     st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.65rem;color:{MUTED};letter-spacing:0.15em;text-transform:uppercase;margin-top:1.5rem;margin-bottom:0.5rem;">Export</div>', unsafe_allow_html=True)
-    pptx_buf = build_pptx(dc, df_f)
-    st.download_button(
-        label="Export to PowerPoint",
-        data=pptx_buf,
-        file_name=f"austin_mf_intelligence_{datetime.now().strftime('%Y%m%d')}.pptx",
-        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    )
+
+    # Submarket selector for export
+    export_subs = sorted(df["submarket_name"].dropna().unique().tolist()) if not df.empty else []
+    export_sub = st.selectbox("Submarket report", ["All Submarkets"] + export_subs,
+                              label_visibility="collapsed", key="export_sub")
+
+    if export_sub != "All Submarkets":
+        pptx_buf = build_submarket_pptx(export_sub, dc, df, dq)
+        fname = export_sub.lower().replace(" ", "_")
+        st.download_button(
+            label=f"Export {export_sub} Report",
+            data=pptx_buf,
+            file_name=f"{fname}_report_{datetime.now().strftime('%Y%m%d')}.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+    else:
+        # Metro-wide summary export (legacy)
+        pptx_buf = build_submarket_pptx("All Submarkets", dc, df, dq)
+        st.download_button(
+            label="Export Metro Summary",
+            data=pptx_buf,
+            file_name=f"austin_mf_intelligence_{datetime.now().strftime('%Y%m%d')}.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FOOTER
