@@ -217,7 +217,7 @@ CREATE INDEX IF NOT EXISTS idx_permits_year      ON co_permits(delivery_year);
 CREATE INDEX IF NOT EXISTS idx_permits_yyyyq     ON co_permits(delivery_yyyyq);
 
 -- Deduplicated view: collapse sub-permits per masterpermitnum,
--- filter to New work_class, 5-1000 units, delivery_year >= 2000.
+-- filter to New work_class, 5-1000 units.
 CREATE OR REPLACE VIEW co_projects AS
 SELECT DISTINCT ON (COALESCE(masterpermitnum, permit_num))
     id, permit_num, masterpermitnum, permit_class, issue_date, address,
@@ -227,7 +227,6 @@ SELECT DISTINCT ON (COALESCE(masterpermitnum, permit_num))
 FROM co_permits
 WHERE work_class = 'NEW'
   AND total_units BETWEEN 5 AND 1000
-  AND delivery_year >= 2000
 ORDER BY COALESCE(masterpermitnum, permit_num), issue_date DESC;
 
 CREATE OR REPLACE VIEW submarket_deliveries AS
