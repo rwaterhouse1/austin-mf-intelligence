@@ -358,11 +358,12 @@ input, select, textarea {{ background-color: {CARD_BG} !important; color: {TEXT}
 def load_permits(min_year=2010):
     conn = psycopg2.connect(DB_DSN)
     df = pd.read_sql(f"""
-        SELECT permit_num, issue_date, address, zip_code, latitude, longitude,
-               total_units, project_name, work_class, submarket_name,
+        SELECT permit_num, masterpermitnum, permit_class, issue_date, address,
+               zip_code, latitude, longitude, total_units, project_name,
+               work_class, submarket_name,
                delivery_year, delivery_quarter, delivery_yyyyq
         FROM co_projects
-        WHERE total_units >= 5 AND delivery_year >= {min_year} AND issue_date IS NOT NULL
+        WHERE delivery_year >= {min_year} AND issue_date IS NOT NULL
         ORDER BY issue_date DESC
     """, conn)
     conn.close()

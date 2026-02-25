@@ -1,6 +1,7 @@
 """
-Austin C-105 Certificate of Occupancy Tracker
-==============================================
+Austin Multifamily Certificate of Occupancy Tracker
+====================================================
+Fetches permit classes: C-104, C-105, C-106
 COMMANDS:
     python pipeline.py setup       # Create DB tables + load zip crosswalk
     python pipeline.py backfill    # Pull all history from Austin Open Data
@@ -32,8 +33,12 @@ load_dotenv()
 DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/austin_co")
 SOCRATA_ENDPOINT = "https://data.austintexas.gov/resource/3syk-w9eu.json"
 SOCRATA_APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN", "")
-MIN_UNITS = 5
 PAGE_SIZE = 1000
+PERMIT_CLASSES = [
+    "C- 104 Three & Four Family Bldgs",
+    "C- 105 Five or More Family Bldgs",
+    "C- 106 Mixed Use",
+]
 BATCH_COMMIT_SIZE = 500  # commit every N records to survive SSL drops
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -162,6 +167,8 @@ CREATE TABLE IF NOT EXISTS zip_submarket_crosswalk (
 CREATE TABLE IF NOT EXISTS co_permits_raw (
     id              SERIAL PRIMARY KEY,
     permit_num      VARCHAR(64) UNIQUE NOT NULL,
+    masterpermitnum VARCHAR(64),
+    permit_class    VARCHAR(128),
     issue_date      DATE,
     address         TEXT,
     zip_code        VARCHAR(10),
@@ -175,12 +182,15 @@ CREATE TABLE IF NOT EXISTS co_permits_raw (
     raw_json        JSONB,
     ingested_at     TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_raw_masterpermit ON co_permits_raw(masterpermitnum);
 CREATE INDEX IF NOT EXISTS idx_raw_issue_date  ON co_permits_raw(issue_date);
 CREATE INDEX IF NOT EXISTS idx_raw_total_units ON co_permits_raw(total_units);
 
 CREATE TABLE IF NOT EXISTS co_permits (
     id              SERIAL PRIMARY KEY,
     permit_num      VARCHAR(64) UNIQUE NOT NULL REFERENCES co_permits_raw(permit_num),
+    masterpermitnum VARCHAR(64),
+    permit_class    VARCHAR(128),
     issue_date      DATE NOT NULL,
     address         TEXT,
     zip_code        VARCHAR(10),
@@ -206,24 +216,19 @@ CREATE INDEX IF NOT EXISTS idx_permits_submarket ON co_permits(submarket_name);
 CREATE INDEX IF NOT EXISTS idx_permits_year      ON co_permits(delivery_year);
 CREATE INDEX IF NOT EXISTS idx_permits_yyyyq     ON co_permits(delivery_yyyyq);
 
--- Deduplicated view: collapse sub-permits (BP/EP/PP/MP) per base permit,
--- then collapse per (address, total_units) to avoid counting the same
--- building multiple times. Capped at 500 units. All work classes included
--- since C-105 permit class already filters to multifamily completions.
+-- Deduplicated view: collapse sub-permits per masterpermitnum,
+-- filter to New work_class, 5-1000 units, delivery_year >= 2000.
 CREATE OR REPLACE VIEW co_projects AS
-SELECT DISTINCT ON (address, total_units)
-    id, permit_num, issue_date, address, zip_code, latitude, longitude,
-    total_units, project_name, work_class, submarket_id, submarket_name,
+SELECT DISTINCT ON (COALESCE(masterpermitnum, permit_num))
+    id, permit_num, masterpermitnum, permit_class, issue_date, address,
+    zip_code, latitude, longitude, total_units, project_name, work_class,
+    submarket_id, submarket_name,
     delivery_year, delivery_quarter, delivery_yyyyq
-FROM (
-    SELECT DISTINCT ON (REGEXP_REPLACE(permit_num, E'\\s+[A-Z]{2}$', ''))
-        *
-    FROM co_permits
-    WHERE total_units >= 5
-      AND total_units <= 500
-    ORDER BY REGEXP_REPLACE(permit_num, E'\\s+[A-Z]{2}$', ''), issue_date DESC
-) base_permits
-ORDER BY address, total_units, issue_date DESC;
+FROM co_permits
+WHERE work_class = 'NEW'
+  AND total_units BETWEEN 5 AND 1000
+  AND delivery_year >= 2000
+ORDER BY COALESCE(masterpermitnum, permit_num), issue_date DESC;
 
 CREATE OR REPLACE VIEW submarket_deliveries AS
 SELECT
@@ -252,11 +257,14 @@ CREATE TABLE IF NOT EXISTS pipeline_log (
 
 ENRICH_SQL = """
 INSERT INTO co_permits (
-    permit_num, issue_date, address, zip_code, latitude, longitude, geom,
-    total_units, project_name, work_class, submarket_id, submarket_name
+    permit_num, masterpermitnum, permit_class, issue_date, address, zip_code,
+    latitude, longitude, geom, total_units, project_name, work_class,
+    submarket_id, submarket_name
 )
 SELECT
     r.permit_num,
+    r.masterpermitnum,
+    r.permit_class,
     r.issue_date,
     r.address,
     r.zip_code,
@@ -280,15 +288,17 @@ LEFT JOIN zip_submarket_crosswalk z
         r.zip_code,
         SUBSTRING(r.address FROM '([0-9]{5})(?:[- ][0-9]{4})?$')
     )
-WHERE r.total_units >= 5
-  AND r.issue_date IS NOT NULL
+WHERE r.issue_date IS NOT NULL
 ON CONFLICT (permit_num) DO UPDATE SET
+    masterpermitnum = EXCLUDED.masterpermitnum,
+    permit_class   = EXCLUDED.permit_class,
     issue_date     = EXCLUDED.issue_date,
     zip_code       = EXCLUDED.zip_code,
     latitude       = EXCLUDED.latitude,
     longitude      = EXCLUDED.longitude,
     geom           = EXCLUDED.geom,
-    total_units      = EXCLUDED.total_units,
+    total_units    = EXCLUDED.total_units,
+    work_class     = EXCLUDED.work_class,
     submarket_id   = EXCLUDED.submarket_id,
     submarket_name = EXCLUDED.submarket_name,
     enriched_at    = NOW();
@@ -296,19 +306,25 @@ ON CONFLICT (permit_num) DO UPDATE SET
 
 UPSERT_RAW_SQL = """
 INSERT INTO co_permits_raw (
-    permit_num, issue_date, address, zip_code, latitude, longitude,
-    total_units, work_class, project_name, permit_type, permit_status, raw_json
+    permit_num, masterpermitnum, permit_class, issue_date, address, zip_code,
+    latitude, longitude, total_units, work_class, project_name, permit_type,
+    permit_status, raw_json
 ) VALUES (
-    %(permit_num)s, %(issue_date)s, %(address)s, %(zip_code)s, %(latitude)s, %(longitude)s,
-    %(total_units)s, %(work_class)s, %(project_name)s, %(permit_type)s, %(permit_status)s, %(raw_json)s
+    %(permit_num)s, %(masterpermitnum)s, %(permit_class)s, %(issue_date)s,
+    %(address)s, %(zip_code)s, %(latitude)s, %(longitude)s, %(total_units)s,
+    %(work_class)s, %(project_name)s, %(permit_type)s, %(permit_status)s,
+    %(raw_json)s
 )
 ON CONFLICT (permit_num) DO UPDATE SET
+    masterpermitnum = EXCLUDED.masterpermitnum,
+    permit_class  = EXCLUDED.permit_class,
     issue_date    = EXCLUDED.issue_date,
     address       = EXCLUDED.address,
     zip_code      = EXCLUDED.zip_code,
     latitude      = EXCLUDED.latitude,
     longitude     = EXCLUDED.longitude,
-    total_units     = EXCLUDED.total_units,
+    total_units   = EXCLUDED.total_units,
+    work_class    = EXCLUDED.work_class,
     permit_status = EXCLUDED.permit_status,
     raw_json      = EXCLUDED.raw_json,
     ingested_at   = NOW()
@@ -363,18 +379,12 @@ def fetch_page(offset: int, since_date: Optional[str] = None) -> list[dict]:
         "$limit":  PAGE_SIZE,
         "$offset": offset,
     }
-    # Push housing_units >= 5 server-side; combine with date filter if present
+    # Fetch all 3 permit classes; no housing_units filter at raw ingest
+    classes_sql = ", ".join(f"'{c}'" for c in PERMIT_CLASSES)
+    where = f"permit_class in({classes_sql})"
     if since_date:
-        params["$where"] = (
-            "permit_class = 'C- 105 Five or More Family Bldgs'"
-            " AND housing_units >= 5 AND housing_units <= 1000"
-            " AND issue_date > '" + since_date + "T00:00:00.000'"
-        )
-    else:
-        params["$where"] = (
-            "permit_class = 'C- 105 Five or More Family Bldgs'"
-            " AND housing_units >= 5 AND housing_units <= 1000"
-        )
+        where += f" AND issue_date > '{since_date}T00:00:00.000'"
+    params["$where"] = where
 
     for _attempt in range(5):
         try:
@@ -389,27 +399,19 @@ def fetch_page(offset: int, since_date: Optional[str] = None) -> list[dict]:
 
 
 def fetch_all(since_date: Optional[str] = None) -> list[dict]:
-    log.info(f"Fetching permits | since={since_date or 'beginning'}")
+    log.info(f"Fetching permits | since={since_date or 'beginning'} | classes={PERMIT_CLASSES}")
     records, offset = [], 0
     while True:
         batch = fetch_page(offset, since_date)
         if not batch:
             break
-        # Filter in Python: 5+ units (housing_units >= 5)
-        filtered = [
-            r for r in batch
-            if (
-                r.get("permit_class", "").strip() == "C- 105 Five or More Family Bldgs"
-                and MIN_UNITS <= _safe_int(r.get("housing_units")) <= 1000
-            )
-        ]
-        records.extend(filtered)
-        log.info(f"  Page {offset//PAGE_SIZE + 1}: {len(batch)} fetched, {len(filtered)} matched ({len(records)} total)")
+        records.extend(batch)
+        log.info(f"  Page {offset//PAGE_SIZE + 1}: {len(batch)} fetched ({len(records)} total)")
         if len(batch) < PAGE_SIZE:
             break
         offset += PAGE_SIZE
         time.sleep(0.2)
-    log.info(f"Total matching: {len(records):,}")
+    log.info(f"Total fetched: {len(records):,}")
     return records
 
 
@@ -440,18 +442,20 @@ def parse_record(r: dict) -> Optional[dict]:
             pass
         zip_code = str(r.get("original_zip") or "").strip()[:5] or None
         return {
-            "permit_num":    permit_num,
-            "issue_date":    issue_date,
-            "address":       (r.get("permit_location") or r.get("location_address") or "").strip(),
-            "zip_code":      zip_code,
-            "latitude":      lat,
-            "longitude":     lon,
-            "total_units":   _safe_int(r.get("housing_units")),
-            "work_class":    r.get("work_class", "").strip().upper(),
-            "project_name":  (r.get("description") or r.get("projectname") or "").strip(),
-            "permit_type":   r.get("permit_type_desc", "").strip(),
-            "permit_status": (r.get("status_current") or r.get("permit_status") or "").strip(),
-            "raw_json":      json.dumps(r),
+            "permit_num":       permit_num,
+            "masterpermitnum":  (r.get("masterpermitnum") or "").strip() or None,
+            "permit_class":     (r.get("permit_class") or "").strip(),
+            "issue_date":       issue_date,
+            "address":          (r.get("permit_location") or r.get("location_address") or "").strip(),
+            "zip_code":         zip_code,
+            "latitude":         lat,
+            "longitude":        lon,
+            "total_units":      _safe_int(r.get("housing_units")),
+            "work_class":       r.get("work_class", "").strip().upper(),
+            "project_name":     (r.get("description") or r.get("projectname") or "").strip(),
+            "permit_type":      r.get("permit_type_desc", "").strip(),
+            "permit_status":    (r.get("status_current") or r.get("permit_status") or "").strip(),
+            "raw_json":         json.dumps(r),
         }
     except Exception as e:
         log.warning(f"Parse error: {e}")
@@ -579,7 +583,7 @@ def start_scheduler():
 # CLI
 # ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Austin C-105 CO Tracker")
+    parser = argparse.ArgumentParser(description="Austin MF CO Tracker (C-104/C-105/C-106)")
     parser.add_argument(
         "command",
         choices=["setup", "backfill", "incremental", "enrich", "schedule", "status"],
